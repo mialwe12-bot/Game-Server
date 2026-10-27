@@ -33,10 +33,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - name: PostgreSQL-Client (pg_dump für Backup-Tests)
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client libcurl4-openssl-dev
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @gameserver/shared build
       - run: pnpm --filter @gameserver/server db:generate
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @gameserver/web build
+      # Achievement-SDK: C-Bibliothek und Python-Modul müssen sich bauen lassen
+      - run: make -C packages/sdk/c
+      - run: python3 -m py_compile packages/sdk/python/gameserver_sdk.py

@@ -1,0 +1,24 @@
+{
+  "name": "@gameserver/sdk",
+  "version": "0.4.0",
+  "description": "Achievement-SDK für Spiele auf einer selbst gehosteten Game-Server-Plattform",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "python", "c", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
