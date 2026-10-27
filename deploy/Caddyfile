@@ -1,0 +1,31 @@
+# Eintrag für den bestehenden Caddy im Docker-Netzwerk "reverse-proxy".
+# Domain anpassen und in die eigene Caddyfile übernehmen, danach: caddy reload
+
+games.example.com {
+	# Text-Antworten komprimieren (Spieldateien sind application/octet-stream und bleiben unkomprimiert,
+	# damit HTTP-Range-Downloads korrekt fortgesetzt werden können)
+	encode zstd gzip
+
+	# API, WebSocket (/api/ws), Uploads und Downloads → Server
+	handle /api/* {
+		reverse_proxy gameserver-server:3000 {
+			# Downloads/Uploads sofort durchreichen, nicht puffern
+			flush_interval -1
+			transport http {
+				# Große Chunk-Uploads und langsame Downloads nicht abbrechen
+				read_timeout 0
+				write_timeout 0
+			}
+		}
+	}
+
+	# Web-Frontend (Store + Admin-Panel)
+	handle {
+		reverse_proxy gameserver-web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}

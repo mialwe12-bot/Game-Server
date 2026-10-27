@@ -1,0 +1,66 @@
+# Game Server – Docker Compose
+# Voraussetzung: externes Docker-Netzwerk "reverse-proxy", in dem Caddy läuft:
+#   docker network create reverse-proxy
+# Caddyfile-Eintrag: siehe deploy/Caddyfile
+
+name: gameserver
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gameserver}
+      POSTGRES_USER: ${POSTGRES_USER:-gameserver}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    image: gameserver-server:latest
+    container_name: gameserver-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gameserver}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gameserver}
+      DATA_DIR: /data
+      TRUST_PROXY: "true"
+    volumes:
+      # Spieldateien, Medien, Avatare, Backups. Für große Bibliotheken auf eine große Platte legen.
+      - ${DATA_PATH:-./data}:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+      - reverse-proxy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: gameserver-web:latest
+    container_name: gameserver-web
+    restart: unless-stopped
+    depends_on:
+      - server
+    networks:
+      - reverse-proxy
+
+networks:
+  internal: {}
+  reverse-proxy:
+    external: true
+
+volumes:
+  postgres-data: {}

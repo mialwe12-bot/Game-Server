@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 
@@ -46,6 +47,14 @@ export type Config = z.infer<typeof schema> & {
   corsOrigins: string[];
 };
 
+function packageVersion(): string {
+  try {
+    return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version as string;
+  } catch {
+    return '0.0.0';
+  }
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
@@ -56,7 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     ...c,
     dataDir: path.resolve(c.DATA_DIR),
-    version: process.env.npm_package_version ?? '0.1.0',
+    version: packageVersion(),
     corsOrigins: c.CORS_ORIGINS.split(',')
       .map((s) => s.trim())
       .filter(Boolean),

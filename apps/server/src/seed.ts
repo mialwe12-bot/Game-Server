@@ -13,6 +13,8 @@ import { hashPassword } from './lib/password.js';
 import { slugify } from './lib/slug.js';
 
 const { values } = parseArgs({
+  // "pnpm seed -- --x" reicht ein einzelnes "--" durch – ignorieren
+  args: process.argv.slice(2).filter((a) => a !== '--'),
   options: {
     username: { type: 'string' },
     email: { type: 'string' },
