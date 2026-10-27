@@ -1,0 +1,52 @@
+{
+  "name": "@gameserver/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "seed": "tsx --env-file-if-exists=../../.env src/seed.ts",
+    "openapi": "tsx src/scripts/export-openapi.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/multipart": "^9.4.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^5.2.3",
+    "@fastify/websocket": "^11.3.4",
+    "@gameserver/shared": "workspace:*",
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^6.19.3",
+    "fastify": "^5.12.7",
+    "fastify-plugin": "^5.1.0",
+    "fastify-type-provider-zod": "^6.1.0",
+    "nodemailer": "^7.0.13",
+    "openid-client": "^6.8.8",
+    "pino": "^9.7.0",
+    "prisma": "^6.19.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/ws": "^8.18.1",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "ws": "^8.18.3"
+  }
+}

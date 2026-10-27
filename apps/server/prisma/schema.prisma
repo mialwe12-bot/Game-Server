@@ -1,0 +1,464 @@
+// Datenbankschema – Phase 1 (Accounts, Spiele, Store, Bibliothek, Admin)
+// Spätere Phasen ergänzen weitere Modelle über neue Migrationen.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  UPLOADER
+  USER
+}
+
+enum SessionKind {
+  WEB
+  DEVICE
+}
+
+enum GameVisibility {
+  PUBLIC      // im Store sichtbar
+  UNLISTED    // nur per Direktlink
+  RESTRICTED  // nur für freigegebene Nutzer
+  HIDDEN      // nur Admins/Maintainer (Entwurf)
+}
+
+enum Platform {
+  WINDOWS
+  LINUX
+  MACOS
+}
+
+enum BuildKind {
+  ZIP
+  SEVEN_ZIP
+  FOLDER
+  INSTALLER
+}
+
+enum LinuxRunner {
+  NONE
+  PROTON
+  WINE
+}
+
+enum BuildStatus {
+  DRAFT
+  READY
+}
+
+enum UploadStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum MediaKind {
+  COVER
+  HEADER
+  BACKGROUND
+  SCREENSHOT
+  ARTWORK
+}
+
+enum DiscoveryAction {
+  SKIPPED
+  WISHLISTED
+  ADDED
+}
+
+enum BackupStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id                String    @id @default(cuid())
+  username          String    @unique
+  email             String    @unique
+  passwordHash      String?
+  role              Role      @default(USER)
+  displayName       String?
+  bio               String?
+  avatarKey         String?
+  locale            String    @default("de")
+  disabled          Boolean   @default(false)
+  totpSecret        String?
+  totpEnabled       Boolean   @default(false)
+  totpLastCounter   Int?
+  recoveryCodes     String[]  @default([])
+  oidcSubject       String?   @unique
+  uploadQuotaBytes  BigInt?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastLoginAt       DateTime?
+
+  sessions          Session[]
+  loginChallenges   LoginChallenge[]
+  resetTokens       PasswordResetToken[]
+  invitesCreated    Invite[]           @relation("InviteCreator")
+  invitedBy         Invite?            @relation("InviteUsedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedById       String?
+  gamesCreated      Game[]             @relation("GameCreator")
+  maintainerOf      GameMaintainer[]
+  accessTo          GameAccess[]
+  uploads           Upload[]
+  library           LibraryEntry[]
+  collections       Collection[]
+  wishlist          WishlistEntry[]
+  discoveryViews    DiscoveryView[]
+  playSessions      PlaySession[]
+  announcements     Announcement[]
+  auditLogs         AuditLog[]
+  downloads         DownloadEvent[]
+  buildFiles        BuildFile[]
+}
+
+model Session {
+  id          String      @id @default(cuid())
+  tokenHash   String      @unique
+  kind        SessionKind
+  name        String?
+  userAgent   String?
+  ip          String?
+  csrfToken   String?
+  createdAt   DateTime    @default(now())
+  lastUsedAt  DateTime    @default(now())
+  expiresAt   DateTime
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginChallenge {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       SessionKind
+  deviceName String?
+  attempts   Int      @default(0)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  role        Role      @default(USER)
+  maxUses     Int       @default(1)
+  uses        Int       @default(0)
+  note        String?
+  expiresAt   DateTime?
+  revoked     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  createdById String?
+  createdBy   User?     @relation("InviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  usedBy      User[]    @relation("InviteUsedBy")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Genre {
+  id    String @id @default(cuid())
+  slug  String @unique
+  name  String
+  games Game[]
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  slug  String @unique
+  name  String
+  games Game[]
+}
+
+model Game {
+  id                 String          @id @default(cuid())
+  slug               String          @unique
+  title              String
+  shortDescription   String          @default("")
+  description        String          @default("")
+  developer          String?
+  publisher          String?
+  releaseDate        DateTime?
+  website            String?
+  trailerUrls        String[]        @default([])
+  systemRequirements Json            @default("{}")
+  visibility         GameVisibility  @default(HIDDEN)
+  featured           Boolean         @default(false)
+  igdbId             String?
+  rawgId             String?
+  downloadCount      Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  publishedAt        DateTime?
+  createdById        String?
+  createdBy          User?           @relation("GameCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  genres             Genre[]
+  tags               Tag[]
+  media              GameMedia[]
+  versions           GameVersion[]
+  maintainers        GameMaintainer[]
+  access             GameAccess[]
+  libraryEntries     LibraryEntry[]
+  wishlistEntries    WishlistEntry[]
+  discoveryViews     DiscoveryView[]
+  playSessions       PlaySession[]
+  collections        CollectionGame[]
+  announcements      Announcement[]
+  downloads          DownloadEvent[]
+
+  @@index([visibility, publishedAt])
+}
+
+model GameMedia {
+  id          String    @id @default(cuid())
+  gameId      String
+  game        Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  kind        MediaKind
+  storageKey  String
+  mimeType    String
+  size        Int
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([gameId, kind])
+}
+
+model GameMaintainer {
+  gameId    String
+  userId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([gameId, userId])
+}
+
+model GameAccess {
+  gameId    String
+  userId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([gameId, userId])
+}
+
+model GameVersion {
+  id          String    @id @default(cuid())
+  gameId      String
+  game        Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  version     String
+  changelog   String    @default("")
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+  builds      Build[]
+
+  @@unique([gameId, version])
+}
+
+model Build {
+  id           String      @id @default(cuid())
+  versionId    String
+  version      GameVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  platform     Platform
+  kind         BuildKind
+  status       BuildStatus @default(DRAFT)
+  executable   String      @default("")
+  launchArgs   String      @default("")
+  workingDir   String      @default("")
+  installerArgs String     @default("")
+  linuxRunner  LinuxRunner @default(NONE)
+  installSize  BigInt      @default(0)
+  totalSize    BigInt      @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  files        BuildFile[]
+  uploads      Upload[]
+
+  @@unique([versionId, platform])
+}
+
+model BuildFile {
+  id         String   @id @default(cuid())
+  buildId    String
+  build      Build    @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  path       String
+  size       BigInt
+  sha256     String
+  storageKey String
+  uploadedById String?
+  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@unique([buildId, path])
+  @@index([uploadedById])
+}
+
+model Upload {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buildId     String
+  build       Build        @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  path        String
+  size        BigInt
+  offset      BigInt       @default(0)
+  expectedSha256 String?
+  sha256      String?
+  status      UploadStatus @default(ACTIVE)
+  error       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId, status])
+}
+
+model LibraryEntry {
+  userId          String
+  gameId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game            Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  favorite        Boolean   @default(false)
+  hidden          Boolean   @default(false)
+  playtimeSeconds Int       @default(0)
+  lastPlayedAt    DateTime?
+  addedAt         DateTime  @default(now())
+
+  @@id([userId, gameId])
+  @@index([gameId])
+}
+
+model Collection {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime         @default(now())
+  games     CollectionGame[]
+
+  @@unique([userId, name])
+}
+
+model CollectionGame {
+  collectionId String
+  gameId       String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  game         Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  addedAt      DateTime   @default(now())
+
+  @@id([collectionId, gameId])
+}
+
+model WishlistEntry {
+  userId    String
+  gameId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, gameId])
+}
+
+model DiscoveryView {
+  userId String
+  gameId String
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game   Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  action DiscoveryAction
+  seenAt DateTime        @default(now())
+
+  @@id([userId, gameId])
+}
+
+model PlaySession {
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  startedAt DateTime
+  endedAt   DateTime
+  seconds   Int
+
+  @@index([userId, startedAt])
+  @@index([gameId, startedAt])
+}
+
+model DownloadEvent {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  buildId   String?
+  createdAt DateTime @default(now())
+
+  @@index([gameId, createdAt])
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  published   Boolean   @default(true)
+  pinned      Boolean   @default(false)
+  gameId      String?
+  game        Game?     @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  authorId    String?
+  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  target    String?
+  meta      Json     @default("{}")
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model Backup {
+  id          String       @id @default(cuid())
+  filename    String       @unique
+  size        BigInt       @default(0)
+  includesFiles Boolean    @default(false)
+  status      BackupStatus @default(RUNNING)
+  error       String?
+  createdAt   DateTime     @default(now())
+  finishedAt  DateTime?
+}
