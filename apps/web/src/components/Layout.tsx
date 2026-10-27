@@ -13,10 +13,11 @@ import { Avatar } from './Avatar';
 import { Markdown } from './Markdown';
 import { ChatNavButton, NotificationBell } from './Social';
 
-function NavItem({ to, children, icon }: { to: string; children: ReactNode; icon: ReactNode }) {
+function NavItem({ to, label, icon, badge, compact }: { to: string; label: string; icon: ReactNode; badge?: ReactNode; compact?: boolean }) {
   return (
     <NavLink
       to={to}
+      title={compact ? label : undefined}
       end={to === '/'}
       className={({ isActive }) =>
         clsx(
@@ -26,7 +27,9 @@ function NavItem({ to, children, icon }: { to: string; children: ReactNode; icon
       }
     >
       {icon}
-      {children}
+      {/* Kopfzeile: nur Shop/Bibliothek mit Text, Rest als Symbol mit Tooltip – sonst reicht die Breite nicht */}
+      {compact ? <span className="sr-only">{label}</span> : label}
+      {badge}
     </NavLink>
   );
 }
@@ -178,7 +181,7 @@ function HeaderSearch() {
   const [q, setQ] = useState('');
   return (
     <form
-      className="relative hidden md:block xl:hidden 2xl:block"
+      className="relative hidden md:block"
       onSubmit={(e) => {
         e.preventDefault();
         navigate(`/search?q=${encodeURIComponent(q)}`);
@@ -236,36 +239,19 @@ export function Layout() {
     if (settings?.siteName) document.title = settings.siteName;
   }, [settings?.siteName]);
 
-  const nav = (
+  const navItems = (compact: boolean) => (
     <>
-      <NavItem to="/" icon={<Store className="size-4" />}>
-        {t('nav.store')}
-      </NavItem>
+      <NavItem to="/" icon={<Store className="size-4" />} label={t('nav.store')} />
       {user && (
         <>
-          <NavItem to="/library" icon={<Library className="size-4" />}>
-            {t('nav.library')}
-          </NavItem>
-          <NavItem to="/discover" icon={<Search className="size-4" />}>
-            {t('nav.discover')}
-          </NavItem>
-          <NavItem to="/wishlist" icon={<Star className="size-4" />}>
-            {t('nav.wishlist')}
-          </NavItem>
-          <NavItem to="/friends" icon={<Users className="size-4" />}>
-            {t('nav.friends')}
-          </NavItem>
-          <NavItem to="/groups" icon={<UsersRound className="size-4" />}>
-            {t('nav.groups')}
-          </NavItem>
-          <NavItem to="/activity" icon={<Activity className="size-4" />}>
-            {t('nav.activity')}
-          </NavItem>
+          <NavItem to="/library" icon={<Library className="size-4" />} label={t('nav.library')} />
+          <NavItem compact={compact} to="/discover" icon={<Search className="size-4" />} label={t('nav.discover')} />
+          <NavItem compact={compact} to="/wishlist" icon={<Star className="size-4" />} label={t('nav.wishlist')} />
+          <NavItem compact={compact} to="/friends" icon={<Users className="size-4" />} label={t('nav.friends')} />
+          <NavItem compact={compact} to="/groups" icon={<UsersRound className="size-4" />} label={t('nav.groups')} />
+          <NavItem compact={compact} to="/activity" icon={<Activity className="size-4" />} label={t('nav.activity')} />
           {desk && (
-            <NavItem to="/downloads" icon={<Download className="size-4" />}>
-              {t('nav.downloads')}
-              {openDownloads > 0 && <span className="rounded-full bg-accent px-1.5 text-xs text-accent-fg">{openDownloads}</span>}
-            </NavItem>
+            <NavItem compact={compact} to="/downloads" icon={<Download className="size-4" />} label={t('nav.downloads')} badge={openDownloads > 0 && <span className="rounded-full bg-accent px-1.5 text-xs text-accent-fg">{openDownloads}</span>} />
           )}
         </>
       )}
@@ -288,7 +274,7 @@ export function Layout() {
             <img src="/favicon.svg" alt="" className="size-7" />
             <span className="hidden whitespace-nowrap sm:inline">{settings?.siteName ?? 'Game Server'}</span>
           </Link>
-          <nav className="hidden items-center gap-1 xl:flex">{nav}</nav>
+          <nav className="hidden items-center gap-1 xl:flex">{navItems(true)}</nav>
           <div className="ml-auto flex items-center gap-2">
             <HeaderSearch />
             {user && (
@@ -305,7 +291,7 @@ export function Layout() {
             <UserMenu />
           </div>
         </div>
-        {mobileOpen && <nav className="flex flex-col gap-1 border-t border-border px-4 py-2 xl:hidden">{nav}</nav>}
+        {mobileOpen && <nav className="flex flex-col gap-1 border-t border-border px-4 py-2 xl:hidden">{navItems(false)}</nav>}
       </header>
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
         <Outlet />
