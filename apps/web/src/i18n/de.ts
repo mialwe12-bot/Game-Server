@@ -1264,7 +1264,7 @@ const de = {
     deleted: 'Cloud-Spielstände gelöscht',
     supported: 'Cloud-Spielstände',
     supportedHint: 'Spielstände werden im Desktop-Client automatisch synchronisiert.',
-    conflictTitle: 'Spielstand-Konflikt',
+    conflictTitle: 'Spielstand-Konflikt: {{title}}',
     conflictText: 'Sowohl dein lokaler Spielstand als auch der in der Cloud wurden seit der letzten Synchronisierung geändert. Welchen möchtest du behalten?',
     local: 'Lokal',
     remote: 'Cloud',

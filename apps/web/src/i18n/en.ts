@@ -1265,7 +1265,7 @@ const en: Translation = {
     deleted: 'Cloud saves deleted',
     supported: 'Cloud saves',
     supportedHint: 'Saves are synced automatically by the desktop client.',
-    conflictTitle: 'Save conflict',
+    conflictTitle: 'Save conflict: {{title}}',
     conflictText: 'Both your local save and the cloud save changed since the last sync. Which one do you want to keep?',
     local: 'Local',
     remote: 'Cloud',
