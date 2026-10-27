@@ -11,6 +11,10 @@ import type { OidcService } from './services/oidc.js';
 import type { SettingsService } from './services/settings.js';
 import type { Storage } from './services/storage.js';
 import type { UploadService } from './services/uploads.js';
+import type { UrlSigner } from './lib/sign.js';
+import type { ActivityService, NotificationService } from './services/notify.js';
+import type { PresenceService } from './services/social.js';
+import type { ChatService } from './services/chat.js';
 
 export interface AppContext {
   config: Config;
@@ -25,6 +29,11 @@ export interface AppContext {
   backups: BackupService;
   metadata: MetadataService;
   oidc: OidcService;
+  signer: UrlSigner;
+  notifications: NotificationService;
+  activity: ActivityService;
+  presence: PresenceService;
+  chat: ChatService;
 }
 
 export interface AuthInfo {

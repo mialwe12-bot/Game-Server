@@ -14,6 +14,9 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   downloadRateLimitKbps: 0,
   uploadChunkBytes: 16 * 1024 ** 2,
   backupSchedule: { enabled: false, intervalHours: 24, includeFiles: false, keep: 7 },
+  voiceEnabled: false,
+  gifsEnabled: true,
+  maxChatImageBytes: 8 * 1024 ** 2,
 };
 
 /** Persistente Admin-Einstellungen mit In-Memory-Cache. */
@@ -27,7 +30,8 @@ export class SettingsService {
     if (this.cache) return this.cache;
     const rows = await this.db.setting.findMany();
     const values: Record<string, unknown> = {};
-    for (const r of rows) values[r.key] = r.value;
+    // Nur bekannte Einstellungen übernehmen (interne Schlüssel wie „internal.*“ bleiben verborgen)
+    for (const r of rows) if (r.key in DEFAULT_SETTINGS) values[r.key] = r.value;
     this.cache = { ...DEFAULT_SETTINGS, ...values } as AdminSettings;
     this.cache.backupSchedule = { ...DEFAULT_SETTINGS.backupSchedule, ...(this.cache.backupSchedule ?? {}) };
     return this.cache;
@@ -58,5 +62,17 @@ export class SettingsService {
 
   invalidate(): void {
     this.cache = null;
+  }
+
+  /** Server-Geheimnis (für signierte URLs): APP_SECRET aus der Umgebung oder einmalig erzeugt und gespeichert. */
+  async appSecret(fromEnv: string): Promise<string> {
+    if (fromEnv) return fromEnv;
+    const row = await this.db.setting.findUnique({ where: { key: 'internal.appSecret' } });
+    if (row && typeof row.value === 'string') return row.value;
+    const { randomToken } = await import('../lib/crypto.js');
+    const secret = randomToken(48);
+    await this.db.setting.upsert({ where: { key: 'internal.appSecret' }, create: { key: 'internal.appSecret', value: secret }, update: {} });
+    const again = await this.db.setting.findUnique({ where: { key: 'internal.appSecret' } });
+    return String(again?.value ?? secret);
   }
 }

@@ -10,6 +10,12 @@ import { storeRoutes } from './store.js';
 import { systemRoutes } from './system.js';
 import { uploadRoutes } from './uploads.js';
 import { wsRoutes } from './ws.js';
+import { chatRoutes } from './chat.js';
+import { communityRoutes } from './community.js';
+import { friendRoutes } from './friends.js';
+import { groupRoutes } from './groups.js';
+import { notificationRoutes } from './notifications.js';
+import { profileRoutes } from './profiles.js';
 
 export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(systemRoutes);
@@ -23,5 +29,12 @@ export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(manageRoutes, { prefix: '/manage' });
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(clientRoutes);
+  // Phase 3 – Soziales
+  await app.register(friendRoutes);
+  await app.register(profileRoutes);
+  await app.register(notificationRoutes);
+  await app.register(chatRoutes, { prefix: '/chat' });
+  await app.register(groupRoutes, { prefix: '/groups' });
+  await app.register(communityRoutes, { prefix: '/community' });
   app.get('/openapi.json', { schema: { hide: true }, config: { allowInMaintenance: true } }, async () => app.swagger());
 };

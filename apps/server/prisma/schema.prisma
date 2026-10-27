@@ -120,6 +120,37 @@ model User {
   auditLogs         AuditLog[]
   downloads         DownloadEvent[]
   buildFiles        BuildFile[]
+
+  // ---- Phase 3: Soziales ----
+  profileBackgroundKey String?
+  profileAccent        String?
+  profileVisibility    ProfileVisibility @default(PUBLIC)
+  allowFriendRequests  Boolean          @default(true)
+  /// Vitrinen auf der Profilseite (JSON-Liste)
+  showcases            Json             @default("[]")
+  /// Benachrichtigungseinstellungen (JSON)
+  notificationPrefs    Json             @default("{}")
+  lastSeenAt           DateTime?
+  friendRequestsSent     Friendship[]   @relation("FriendRequester")
+  friendRequestsReceived Friendship[]   @relation("FriendAddressee")
+  blocking             Block[]          @relation("Blocker")
+  blockedBy            Block[]          @relation("Blocked")
+  conversationsCreated Conversation[]   @relation("ConversationCreator")
+  conversationMembers  ConversationMember[]
+  messages             Message[]
+  groupsCreated        Group[]          @relation("GroupCreator")
+  groupMemberships     GroupMember[]
+  groupAnnouncements   GroupAnnouncement[]
+  groupEvents          GroupEvent[]
+  eventRsvps           GroupEventRsvp[]
+  reviews              Review[]
+  reviewVotes          ReviewVote[]
+  forumTopics          ForumTopic[]
+  forumPosts           ForumPost[]
+  communityItems       CommunityItem[]
+  communityLikes       CommunityLike[]
+  notifications        Notification[]
+  activities           Activity[]
 }
 
 model Session {
@@ -232,6 +263,11 @@ model Game {
   collections        CollectionGame[]
   announcements      Announcement[]
   downloads          DownloadEvent[]
+  reviews            Review[]
+  forumTopics        ForumTopic[]
+  communityItems     CommunityItem[]
+  groupEvents        GroupEvent[]
+  activities         Activity[]
 
   @@index([visibility, publishedAt])
 }
@@ -501,4 +537,314 @@ model ClientReleaseFile {
   createdAt  DateTime         @default(now())
 
   @@unique([releaseId, platform, arch, format])
+}
+
+// ---- Phase 3: Soziales ----
+
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  requester   User             @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee   User             @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+model Block {
+  blockerId String
+  blockedId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+  CHANNEL
+}
+
+model Conversation {
+  id            String               @id @default(cuid())
+  type          ConversationType
+  title         String?
+  /// Eindeutiger Schlüssel für Direktnachrichten (sortierte Nutzer-IDs)
+  directKey     String?              @unique
+  groupId       String?
+  group         Group?               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById   String?
+  createdBy     User?                @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime             @default(now())
+  lastMessageAt DateTime             @default(now())
+  members       ConversationMember[]
+  messages      Message[]
+
+  @@index([groupId])
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isAdmin        Boolean      @default(false)
+  muted          Boolean      @default(false)
+  lastReadAt     DateTime     @default(now())
+  joinedAt       DateTime     @default(now())
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorId       String?
+  author         User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body           String       @default("")
+  attachmentKey  String?
+  attachmentMime String?
+  gifUrl         String?
+  createdAt      DateTime     @default(now())
+  editedAt       DateTime?
+  deletedAt      DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+enum GroupJoinPolicy {
+  OPEN
+  REQUEST
+  INVITE
+}
+
+enum GroupVisibility {
+  PUBLIC
+  HIDDEN
+}
+
+enum GroupRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+enum GroupMemberStatus {
+  ACTIVE
+  PENDING
+  INVITED
+}
+
+model Group {
+  id            String              @id @default(cuid())
+  slug          String              @unique
+  name          String
+  summary       String              @default("")
+  description   String              @default("")
+  avatarKey     String?
+  bannerKey     String?
+  joinPolicy    GroupJoinPolicy     @default(OPEN)
+  visibility    GroupVisibility     @default(PUBLIC)
+  createdById   String?
+  createdBy     User?               @relation("GroupCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime            @default(now())
+  members       GroupMember[]
+  announcements GroupAnnouncement[]
+  events        GroupEvent[]
+  channels      Conversation[]
+}
+
+model GroupMember {
+  groupId   String
+  userId    String
+  group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      GroupRole         @default(MEMBER)
+  status    GroupMemberStatus @default(ACTIVE)
+  joinedAt  DateTime          @default(now())
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+model GroupAnnouncement {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model GroupEvent {
+  id          String           @id @default(cuid())
+  groupId     String
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  description String           @default("")
+  startsAt    DateTime
+  endsAt      DateTime?
+  gameId      String?
+  game        Game?            @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  reminded    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  rsvps       GroupEventRsvp[]
+
+  @@index([groupId, startsAt])
+}
+
+enum RsvpStatus {
+  GOING
+  MAYBE
+  DECLINED
+}
+
+model GroupEventRsvp {
+  eventId String
+  userId  String
+  event   GroupEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status  RsvpStatus
+
+  @@id([eventId, userId])
+}
+
+model Review {
+  id               String       @id @default(cuid())
+  gameId           String
+  userId           String
+  game             Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommended      Boolean
+  body             String
+  playtimeAtReview Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  votes            ReviewVote[]
+
+  @@unique([gameId, userId])
+  @@index([gameId, createdAt])
+}
+
+model ReviewVote {
+  reviewId String
+  userId   String
+  review   Review  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  helpful  Boolean
+  funny    Boolean @default(false)
+
+  @@id([reviewId, userId])
+}
+
+model ForumTopic {
+  id         String      @id @default(cuid())
+  gameId     String
+  game       Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  authorId   String?
+  author     User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  title      String
+  pinned     Boolean     @default(false)
+  locked     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  lastPostAt DateTime    @default(now())
+  posts      ForumPost[]
+
+  @@index([gameId, lastPostAt])
+}
+
+model ForumPost {
+  id        String     @id @default(cuid())
+  topicId   String
+  topic     ForumTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime   @default(now())
+  editedAt  DateTime?
+
+  @@index([topicId, createdAt])
+}
+
+enum CommunityItemType {
+  SCREENSHOT
+  ARTWORK
+  GUIDE
+}
+
+model CommunityItem {
+  id        String            @id @default(cuid())
+  gameId    String
+  game      Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  type      CommunityItemType
+  title     String
+  body      String            @default("")
+  imageKey  String?
+  imageMime String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  likes     CommunityLike[]
+
+  @@index([gameId, type, createdAt])
+}
+
+model CommunityLike {
+  itemId    String
+  userId    String
+  item      CommunityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@id([itemId, userId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  data      Json      @default("{}")
+  readAt    DateTime?
+  emailedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  data      Json     @default("{}")
+  gameId    String?
+  game      Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

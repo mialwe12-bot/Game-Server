@@ -78,11 +78,13 @@ export const libraryRoutes: FastifyPluginAsyncZod = async (app) => {
   app.put('/:gameId', { schema: { tags: ['library'], summary: 'Spiel zur Bibliothek hinzufügen', params: gameParams } }, async (req) => {
     const { user } = requireAuth(req);
     const game = await viewableGame(user.id, req.params.gameId);
+    const existing = await ctx.db.libraryEntry.findUnique({ where: { userId_gameId: { userId: user.id, gameId: game.id } } });
     await ctx.db.libraryEntry.upsert({
       where: { userId_gameId: { userId: user.id, gameId: game.id } },
       create: { userId: user.id, gameId: game.id },
       update: {},
     });
+    if (!existing) await ctx.activity.record(user.id, 'library.added', {}, game.id);
     await ctx.db.wishlistEntry.deleteMany({ where: { userId: user.id, gameId: game.id } });
     ctx.hub.toUser(user.id, { type: 'library.updated', data: { gameId: game.id } });
     return { ok: true };

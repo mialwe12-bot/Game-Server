@@ -116,6 +116,11 @@ export interface AdminSettings {
   downloadRateLimitKbps: number;
   uploadChunkBytes: number;
   backupSchedule: BackupSchedule;
+  /** Sprachchat (WebRTC) in Chats/Gruppen erlauben */
+  voiceEnabled: boolean;
+  /** GIF-Suche im Chat (nur wirksam mit TENOR_API_KEY) */
+  gifsEnabled: boolean;
+  maxChatImageBytes: number;
 }
 
 export interface GenreDto {
@@ -414,7 +419,25 @@ export type WsEvent =
   | { type: 'announcement.created'; data: AnnouncementDto }
   | { type: 'library.updated'; data: { gameId: string } }
   | { type: 'session.revoked'; data: { sessionId: string } }
-  | { type: 'pong'; data: { time: string } };
+  | { type: 'pong'; data: { time: string } }
+  // Phase 3
+  | { type: 'notification'; data: import('./social.js').NotificationDto }
+  | { type: 'presence'; data: import('./social.js').Presence }
+  | { type: 'chat.message'; data: import('./social.js').MessageDto }
+  | { type: 'chat.message.updated'; data: import('./social.js').MessageDto }
+  | { type: 'chat.typing'; data: { conversationId: string; userId: string; username: string } }
+  | { type: 'chat.conversation'; data: { conversationId: string } }
+  | { type: 'friends.changed'; data: Record<string, never> }
+  | { type: 'voice.participants'; data: { conversationId: string; userIds: string[] } }
+  | { type: 'voice.signal'; data: { conversationId: string; from: string; signal: unknown } };
+
+/** Nachrichten vom Client an den Server über den WebSocket */
+export type WsClientMessage =
+  | { type: 'ping' }
+  | { type: 'chat.typing'; data: { conversationId: string } }
+  | { type: 'voice.join'; data: { conversationId: string } }
+  | { type: 'voice.leave'; data: { conversationId: string } }
+  | { type: 'voice.signal'; data: { conversationId: string; to: string; signal: unknown } };
 
 // ---- Phase 2: Desktop-Client ----
 

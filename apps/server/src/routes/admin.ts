@@ -295,6 +295,9 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
               includeFiles: z.boolean(),
               keep: z.number().int().min(0).max(1000),
             }),
+            voiceEnabled: z.boolean(),
+            gifsEnabled: z.boolean(),
+            maxChatImageBytes: z.number().int().min(64 * 1024).max(100 * 1024 ** 2),
           })
           .partial(),
       },

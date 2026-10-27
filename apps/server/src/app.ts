@@ -31,6 +31,11 @@ import { OidcService } from './services/oidc.js';
 import { SettingsService } from './services/settings.js';
 import { Storage } from './services/storage.js';
 import { UploadService } from './services/uploads.js';
+import { UrlSigner } from './lib/sign.js';
+import { ActivityService, NotificationService } from './services/notify.js';
+import { PresenceService } from './services/social.js';
+import { ChatService } from './services/chat.js';
+import { startEventReminders } from './services/groups.js';
 
 // BigInt (Dateigrößen) sicher als Zahl serialisieren.
 (BigInt.prototype as unknown as { toJSON: () => number }).toJSON = function (this: bigint) {
@@ -70,6 +75,12 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   ctx.backups = new BackupService(ctx);
   ctx.metadata = new MetadataService(ctx);
   ctx.oidc = new OidcService(ctx);
+  ctx.notifications = new NotificationService(ctx);
+  ctx.activity = new ActivityService(ctx);
+  ctx.presence = new PresenceService(ctx);
+  ctx.chat = new ChatService(ctx);
+  ctx.signer = new UrlSigner(await ctx.settings.appSecret(config.APP_SECRET));
+  ctx.presence.start();
   app.decorate('ctx', ctx);
   await ctx.storage.init();
 
@@ -180,7 +191,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     ctx.backups.startScheduler();
     const cleanup = setInterval(() => void ctx.uploads.cleanupStale().catch(() => undefined), 3600_000);
     cleanup.unref();
-    app.addHook('onClose', async () => clearInterval(cleanup));
+    const reminders = startEventReminders(ctx);
+    app.addHook('onClose', async () => {
+      clearInterval(cleanup);
+      clearInterval(reminders);
+    });
   }
 
   return app as unknown as FastifyInstance;

@@ -40,6 +40,12 @@ const schema = z.object({
   IGDB_CLIENT_SECRET: z.string().default(''),
   RAWG_API_KEY: z.string().default(''),
   PG_DUMP_PATH: z.string().default('pg_dump'),
+  // Phase 3
+  APP_SECRET: z.string().default(''),
+  TENOR_API_KEY: z.string().default(''),
+  WEBRTC_STUN_URLS: z.string().default(''),
+  WEBRTC_TURN_URLS: z.string().default(''),
+  WEBRTC_TURN_SECRET: z.string().default(''),
 });
 
 export type Config = z.infer<typeof schema> & {
