@@ -61,6 +61,15 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
     if (e.type === 'hello' && presenceGame) reportPresence();
   });
 
+  /** Start aus Verknüpfung gescheitert: bei Cloud-Konflikt Dialog anbieten und danach starten */
+  const offerConflict = (gameId: string) => {
+    if (isOverlayWindow) return;
+    void desktop
+      .cloudStatus(gameId)
+      .then((r) => r.status === 'conflict' && setConflict({ result: r, launchAfter: true }))
+      .catch(() => undefined);
+  };
+
   useEffect(() => {
     void reload();
     const subs = [
@@ -78,8 +87,12 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
         navigate('/', { replace: true });
       }),
       desktop.on<string>(DESKTOP_EVENTS.launchRequest, (gameId) => {
+        if (isOverlayWindow) return;
+        // Vorgemerkte Anfrage verbrauchen, damit sie nicht später (z. B. im Overlay-Fenster) erneut greift
+        void desktop.takeLaunchRequest();
         const game = installedRef.current.find((g) => g.gameId === gameId);
         navigate(game ? `/game/${game.slug}` : '/library');
+        offerConflict(gameId);
       }),
       // Cloud-Konflikt nach Spielende (Upload) – Dialog im Hauptfenster
       desktop.on<CloudSyncResult>(DESKTOP_EVENTS.cloud, (r) => {
@@ -96,7 +109,13 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
       }),
     ];
     // Start über Verknüpfung, der beim Hochfahren nicht direkt gelang
-    void desktop.takeLaunchRequest().then((id) => id && navigate(`/library?game=${id}`));
+    if (!isOverlayWindow) {
+      void desktop.takeLaunchRequest().then((id) => {
+        if (!id) return;
+        navigate(`/library?game=${id}`);
+        offerConflict(id);
+      });
+    }
     return () => {
       for (const s of subs) void s.then((un) => un());
     };
