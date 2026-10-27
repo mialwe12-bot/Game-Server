@@ -160,7 +160,7 @@ export function SocialSettings() {
       <Card title={t('social.settings.notifications')}>
         <p className="mb-3 text-sm text-muted">{t('social.settings.emailHint')}</p>
         <div className="space-y-3">
-          {(['friends', 'messages', 'groups', 'events', 'community'] as const).map((k) => (
+          {(['friends', 'messages', 'groups', 'events', 'community', 'trading'] as const).map((k) => (
             <Toggle key={k} checked={draft.notificationPrefs.email[k]} onChange={(v) => setEmail(k, v)} label={t(`social.settings.email.${k}`)} />
           ))}
         </div>

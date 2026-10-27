@@ -10,6 +10,7 @@ import { Markdown } from '../../components/Markdown';
 import { PlatformIcon } from '../../components/PlatformIcons';
 import { Badge, Button, Card, ErrorState, PageLoader, Tabs } from '../../components/ui';
 import { GameCommunity, GameTabs, type GameTab } from '../community/GameCommunity';
+import { GameExtras } from './GameExtras';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDate, formatPlaytime } from '../../lib/format';
@@ -367,6 +368,7 @@ export default function GamePage() {
                 {t('store.playtime')}: {formatPlaytime(g.playtimeSeconds)}
               </p>
             )}
+            <GameExtras game={g} />
           </Card>
 
           {desk ? (

@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatBytes } from '../lib/format';
 import { toast } from '../lib/toast';
+import { IntegrationSettings } from './IntegrationSettings';
 import { desktop, desktopError } from './bridge';
 import { useDesktopRequired } from './DesktopProvider';
 
@@ -171,6 +172,8 @@ export default function ClientSettingsPage() {
           <Toggle checked={config.notifications} onChange={(v) => void updateConfig({ notifications: v })} label={t('desktop.notifications')} />
         </div>
       </Card>
+
+      <IntegrationSettings />
 
       <Card title={t('desktop.system')}>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">

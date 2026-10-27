@@ -62,7 +62,8 @@ function Linkified({ text }: { text: string }) {
   );
 }
 
-export default function ChatPage() {
+/** `basePath` erlaubt die Einbettung im Overlay-Fenster (eigene Routen) */
+export default function ChatPage({ basePath = '/chat', compact = false }: { basePath?: string; compact?: boolean } = {}) {
   const { id } = useParams();
   const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
@@ -71,7 +72,12 @@ export default function ChatPage() {
   const v = useVoice();
 
   return (
-    <div className="-my-2 grid h-[calc(100vh-10rem)] min-h-[480px] overflow-hidden rounded-lg border border-border bg-surface md:grid-cols-[300px_1fr]">
+    <div
+      className={clsx(
+        'grid overflow-hidden rounded-lg border border-border bg-surface',
+        compact ? 'h-full md:grid-cols-[220px_1fr]' : '-my-2 h-[calc(100vh-10rem)] min-h-[480px] md:grid-cols-[300px_1fr]',
+      )}
+    >
       <aside className={clsx('flex min-h-0 flex-col border-r border-border', id && 'hidden md:flex')}>
         <div className="flex items-center justify-between border-b border-border p-3">
           <h1 className="font-semibold">{t('social.chat.title')}</h1>
@@ -83,7 +89,7 @@ export default function ChatPage() {
           {conversations.data?.map((c) => (
             <Link
               key={c.id}
-              to={`/chat/${c.id}`}
+              to={`${basePath}/${c.id}`}
               className={clsx('flex items-center gap-3 border-b border-border px-3 py-2.5 hover:bg-surface-2', c.id === id && 'bg-accent/10')}
             >
               {c.type === 'CHANNEL' ? (
@@ -114,7 +120,7 @@ export default function ChatPage() {
       </aside>
       <section className={clsx('min-h-0 flex-col', id ? 'flex' : 'hidden md:flex')}>
         {id && config.data ? (
-          <ConversationView key={id} id={id} config={config.data} />
+          <ConversationView key={id} id={id} config={config.data} basePath={basePath} />
         ) : (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState title={t('social.chat.pick')}>
@@ -130,7 +136,7 @@ export default function ChatPage() {
   );
 }
 
-function ConversationView({ id, config }: { id: string; config: ChatConfig }) {
+function ConversationView({ id, config, basePath }: { id: string; config: ChatConfig; basePath: string }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -217,7 +223,7 @@ function ConversationView({ id, config }: { id: string; config: ChatConfig }) {
   if (conv.error || !conv.data) {
     return (
       <div className="p-6 text-sm text-muted">
-        {errorMessage(conv.error)} · <Link to="/chat">{t('common.back')}</Link>
+        {errorMessage(conv.error)} · <Link to={basePath}>{t('common.back')}</Link>
       </div>
     );
   }
@@ -235,7 +241,7 @@ function ConversationView({ id, config }: { id: string; config: ChatConfig }) {
   return (
     <>
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
-        <Link to="/chat" className="text-sm text-accent md:hidden">
+        <Link to={basePath} className="text-sm text-accent md:hidden">
           ←
         </Link>
         <div className="min-w-0 flex-1">
@@ -316,7 +322,7 @@ function ConversationView({ id, config }: { id: string; config: ChatConfig }) {
       </div>
       <div className="h-5 px-4 text-xs text-muted">{typingNames.length > 0 && t('social.chat.typing', { names: typingNames.join(', ') })}</div>
       <Composer id={id} config={config} onSent={() => (stickToBottom.current = true)} />
-      {manage && c.type === 'GROUP' && <ManageGroupChatModal conv={c} onClose={() => setManage(false)} onLeft={() => navigate('/chat')} />}
+      {manage && c.type === 'GROUP' && <ManageGroupChatModal conv={c} onClose={() => setManage(false)} onLeft={() => navigate(basePath)} />}
     </>
   );
 }

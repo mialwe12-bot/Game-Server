@@ -130,6 +130,32 @@ export default function SettingsPage() {
         <p className="mt-3 text-xs text-muted">{t('admin.settingsPage.socialHint')}</p>
       </Card>
 
+      <Card title={t('admin.settingsPage.steam')}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Toggle checked={s.cloudSavesEnabled} onChange={(v) => setS({ ...s, cloudSavesEnabled: v })} label={t('admin.settingsPage.cloudSavesEnabled')} />
+          <Toggle checked={s.workshopEnabled} onChange={(v) => setS({ ...s, workshopEnabled: v })} label={t('admin.settingsPage.workshopEnabled')} />
+          <Toggle checked={s.cardsEnabled} onChange={(v) => setS({ ...s, cardsEnabled: v })} label={t('admin.settingsPage.cardsEnabled')} />
+          <Toggle checked={s.marketEnabled} onChange={(v) => setS({ ...s, marketEnabled: v })} label={t('admin.settingsPage.marketEnabled')} disabled={!s.cardsEnabled} />
+          <Toggle checked={s.giftsEnabled} onChange={(v) => setS({ ...s, giftsEnabled: v })} label={t('admin.settingsPage.giftsEnabled')} />
+          <div />
+          <Field label={t('admin.settingsPage.cloudSaveVersions')}>
+            <Input type="number" min={1} max={100} value={s.cloudSaveVersions} onChange={(e) => setS({ ...s, cloudSaveVersions: Math.max(1, num(e.target.value)) })} />
+          </Field>
+          <Field label={t('admin.settingsPage.cloudQuotaMb')} hint={t('admin.settingsPage.zeroUnlimited')}>
+            <Input type="number" min={0} value={Math.round(s.cloudQuotaBytes / 1024 ** 2)} onChange={(e) => setS({ ...s, cloudQuotaBytes: num(e.target.value) * 1024 ** 2 })} />
+          </Field>
+          <Field label={t('admin.settingsPage.maxWorkshopMb')}>
+            <Input type="number" min={1} value={Math.round(s.maxWorkshopFileBytes / 1024 ** 2)} onChange={(e) => setS({ ...s, maxWorkshopFileBytes: Math.max(1, num(e.target.value)) * 1024 ** 2 })} />
+          </Field>
+          <Field label={t('admin.settingsPage.cardDropMinutes')}>
+            <Input type="number" min={1} max={1440} value={s.cardDropMinutes} onChange={(e) => setS({ ...s, cardDropMinutes: Math.max(1, num(e.target.value)) })} />
+          </Field>
+          <Field label={t('admin.settingsPage.discordAppId')} hint={t('admin.settingsPage.discordHint')}>
+            <Input value={s.discordAppId} inputMode="numeric" onChange={(e) => setS({ ...s, discordAppId: e.target.value.replace(/\D/g, '') })} />
+          </Field>
+        </div>
+      </Card>
+
       <Card title={t('admin.settingsPage.mail')}>
         <Button onClick={() => testMail.mutate()} loading={testMail.isPending} disabled={!pub?.smtpEnabled}>
           {t('admin.settingsPage.testMail')}

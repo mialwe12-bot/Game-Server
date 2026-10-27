@@ -2,6 +2,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
+  CloudSyncResult,
+  ImportCandidate,
+  LocalScreenshot,
+  SteamStatus,
+  SunshineStatus,
+  SyncCounts,
+  WorkshopSyncResult,
   ClientUpdateInfo,
   DesktopConfig,
   DiskSpace,
@@ -16,6 +23,9 @@ import type {
 } from '@gameserver/shared';
 
 export const isDesktop = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+/** Läuft dieses Frontend im Overlay-Fenster des Clients? (Das Overlay lädt `#/overlay`.) */
+export const isOverlayWindow = isDesktop && window.location.hash.startsWith('#/overlay');
 
 export const desktop = {
   getConfig: () => invoke<DesktopConfig>('get_config'),
@@ -62,6 +72,25 @@ export const desktop = {
   checkClientUpdate: () => invoke<ClientUpdateInfo>('check_client_update'),
   installClientUpdate: () => invoke<void>('install_client_update'),
   showNotification: (title: string, body: string) => invoke<void>('show_notification', { title, body }),
+
+  // ---- Phase 4 ----
+  toggleOverlay: (show?: boolean) => invoke<boolean>('toggle_overlay', { show: show ?? null }),
+  openOverlayBrowser: (url: string) => invoke<void>('open_overlay_browser', { url }),
+  takeScreenshot: () => invoke<LocalScreenshot>('take_screenshot'),
+  listScreenshots: () => invoke<LocalScreenshot[]>('list_screenshots'),
+  /** PNG-Bytes eines lokalen Screenshots (für Vorschau/Upload) */
+  readScreenshot: (path: string) => invoke<ArrayBuffer>('read_screenshot', { path }),
+  deleteScreenshot: (path: string) => invoke<void>('delete_screenshot', { path }),
+  openScreenshotFolder: () => invoke<void>('open_screenshot_folder'),
+  cloudSync: (gameId: string, mode: 'auto' | 'upload' | 'download') => invoke<CloudSyncResult>('cloud_sync', { gameId, mode }),
+  cloudStatus: (gameId: string) => invoke<CloudSyncResult>('cloud_status', { gameId }),
+  workshopSync: () => invoke<WorkshopSyncResult>('workshop_sync'),
+  steamStatus: () => invoke<SteamStatus>('steam_status'),
+  steamSyncShortcuts: (userId: string | null) => invoke<SyncCounts>('steam_sync_shortcuts', { userId }),
+  sunshineStatus: () => invoke<SunshineStatus>('sunshine_status'),
+  sunshineSync: () => invoke<SyncCounts>('sunshine_sync'),
+  scanFolder: (path: string) => invoke<ImportCandidate[]>('scan_folder', { path }),
+  importGame: (path: string, gameId: string, buildId: string) => invoke<InstalledGame>('import_game', { path, gameId, buildId }),
 
   on: <T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> => listen<T>(event, (e) => cb(e.payload)),
 };

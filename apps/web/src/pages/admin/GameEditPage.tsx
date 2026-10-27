@@ -12,8 +12,12 @@ import { DetailsTab } from './game/DetailsTab';
 import { MediaTab } from './game/MediaTab';
 import { MetadataTab } from './game/MetadataTab';
 import { PermissionsTab } from './game/PermissionsTab';
+import { AchievementsTab } from './game/AchievementsTab';
+import { CardsTab } from './game/CardsTab';
+import { CodesTab } from './game/CodesTab';
+import { FeaturesTab } from './game/FeaturesTab';
 
-type Tab = 'details' | 'media' | 'builds' | 'metadata' | 'permissions';
+type Tab = 'details' | 'media' | 'builds' | 'metadata' | 'permissions' | 'features' | 'achievements' | 'cards' | 'codes';
 
 export default function GameEditPage() {
   const { id = '' } = useParams();
@@ -59,6 +63,10 @@ export default function GameEditPage() {
           { id: 'builds', label: t('admin.tabs.builds') },
           { id: 'metadata', label: t('admin.tabs.metadata') },
           { id: 'permissions', label: t('admin.tabs.permissions') },
+          { id: 'features', label: t('admin.tabs.features') },
+          { id: 'achievements', label: t('admin.tabs.achievements') },
+          { id: 'cards', label: t('admin.tabs.cards') },
+          { id: 'codes', label: t('admin.tabs.codes') },
         ]}
       />
       {tab === 'details' && <DetailsTab game={g} onSaved={update} />}
@@ -66,6 +74,10 @@ export default function GameEditPage() {
       {tab === 'builds' && <BuildsTab game={g} onChange={reload} />}
       {tab === 'metadata' && <MetadataTab game={g} onSaved={update} />}
       {tab === 'permissions' && <PermissionsTab game={g} onSaved={update} />}
+      {tab === 'features' && <FeaturesTab game={g} onSaved={update} />}
+      {tab === 'achievements' && <AchievementsTab game={g} />}
+      {tab === 'cards' && <CardsTab game={g} />}
+      {tab === 'codes' && <CodesTab game={g} />}
     </div>
   );
 }

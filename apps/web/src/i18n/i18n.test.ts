@@ -28,6 +28,11 @@ describe('Übersetzungen', () => {
     const text = fs.readFileSync(file, 'utf8');
     // Nur statische Schlüssel t('a.b'); dynamische (Template-Strings) werden übersprungen
     for (const m of text.matchAll(/\bt\(\s*'([a-zA-Z0-9_.]+)'/g)) keys.add(m[1]);
+    // Bedingte Schlüssel: t(cond ? 'a.b' : 'c.d')
+    for (const m of text.matchAll(/\bt\(\s*[\w.!]+\s*\?\s*'([a-zA-Z0-9_.]+)'\s*:\s*'([a-zA-Z0-9_.]+)'/g)) {
+      keys.add(m[1]);
+      keys.add(m[2]);
+    }
   }
 
   it('findet Schlüssel im Code', () => {

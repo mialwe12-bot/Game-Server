@@ -19,6 +19,12 @@ function activityText(t: (k: string, o?: Record<string, unknown>) => string, a: 
       return t('social.activity.friendAdded', { name: d.displayName ?? d.username ?? '' });
     case 'forum.topic':
       return t('social.activity.forumTopic', { title: d.title ?? '' });
+    case 'achievement.unlocked':
+      return t('social.activity.achievementUnlocked', { name: d.name ?? '' });
+    case 'badge.crafted':
+      return t('social.activity.badgeCrafted', { level: d.level ?? '1' });
+    case 'workshop.published':
+      return t('social.activity.workshopPublished', { title: d.title ?? '' });
     default:
       return t(`social.activity.${a.type === 'library.added' ? 'libraryAdded' : 'gamePlayed'}`);
   }
@@ -30,6 +36,8 @@ function activityLink(a: ActivityDto): string | null {
   if (a.type === 'friend.added' && d.username) return `/u/${d.username}`;
   if (a.type === 'forum.topic' && a.game && d.topicId) return `/game/${a.game.slug}/forum/${d.topicId}`;
   if (a.type === 'community.posted' && d.itemId) return `/community/items/${d.itemId}`;
+  if (a.type === 'achievement.unlocked' && a.game) return `/game/${a.game.slug}/achievements`;
+  if (a.type === 'workshop.published' && d.itemId) return `/workshop/${d.itemId}`;
   if (a.type === 'review.created' && a.game) return `/game/${a.game.slug}/reviews`;
   return a.game ? `/game/${a.game.slug}` : null;
 }

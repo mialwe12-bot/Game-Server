@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Award, Ban, Camera, Gamepad2, Library, Lock, MessageSquare, Settings, ThumbsDown, ThumbsUp, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Trophy, Award, Ban, Camera, Gamepad2, Library, Lock, MessageSquare, Settings, ThumbsDown, ThumbsUp, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -15,6 +15,9 @@ import { useAuth } from '../../lib/auth';
 import { formatDate, formatPlaytime } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import { ActivityList } from './ActivityList';
+import { AchievementIcon } from '../admin/game/AchievementsTab';
+import { LevelBadge } from '../cards/CardView';
+import { WorkshopCard } from '../workshop/WorkshopTab';
 
 const BADGE_ICONS: Record<string, ReactNode> = {
   collector: <Library className="size-6" />,
@@ -23,6 +26,7 @@ const BADGE_ICONS: Record<string, ReactNode> = {
   social: <Users className="size-6" />,
   photographer: <Camera className="size-6" />,
   veteran: <Award className="size-6" />,
+  hunter: <Trophy className="size-6" />,
 };
 
 export function BadgeList({ badges }: { badges: BadgeDto[] }) {
@@ -151,6 +155,49 @@ function Showcase({ s, profile }: { s: ResolvedShowcase; profile: ProfileDto }) 
           <BadgeList badges={profile.badges} />
         </Section>
       );
+    case 'achievements':
+      return (
+        <Section title={title}>
+          <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
+            {s.achievements.map((a) => (
+              <Link key={a.id} to={`/game/${a.game.slug}/achievements`} title={`${a.name} – ${a.game.title} (${a.rarity} %)`}>
+                <AchievementIcon url={a.iconUrl} size={56} />
+              </Link>
+            ))}
+          </div>
+          {!s.achievements.length && <p className="text-sm text-muted">—</p>}
+          <Link to={`/u/${profile.user.username}/achievements`} className="mt-2 inline-block text-xs text-accent hover:underline">
+            {t('achievements.showAll', { count: profile.achievementCount })}
+          </Link>
+        </Section>
+      );
+    case 'gameBadges':
+      return (
+        <Section title={title}>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {s.gameBadges.map((b) => (
+              <li key={b.game.id} className="flex items-center gap-3 rounded-md bg-surface-2 p-2">
+                <LevelBadge level={b.level} />
+                <Link to={`/game/${b.game.slug}`} className="flex-1 truncate hover:text-accent">
+                  {b.game.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {!s.gameBadges.length && <p className="text-sm text-muted">—</p>}
+        </Section>
+      );
+    case 'workshop':
+      return (
+        <Section title={title}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {s.workshopItems.map((i) => (
+              <WorkshopCard key={i.id} item={i} />
+            ))}
+          </div>
+          {!s.workshopItems.length && <p className="text-sm text-muted">—</p>}
+        </Section>
+      );
     case 'stats':
       return profile.stats ? (
         <Section title={title}>
@@ -172,6 +219,7 @@ function StatsGrid({ profile }: { profile: ProfileDto }) {
     [t('social.profile.friends'), s.friends],
     [t('social.profile.screenshots'), s.screenshots],
     [t('social.profile.groups'), s.groups],
+    [t('social.profile.achievements'), s.achievements],
   ];
   return (
     <dl className="grid grid-cols-3 gap-3 text-center">
@@ -188,7 +236,7 @@ function StatsGrid({ profile }: { profile: ProfileDto }) {
 export default function ProfilePage() {
   const { username = '' } = useParams();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, settings } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const profile = useQuery({ queryKey: ['profile', username.toLowerCase()], queryFn: () => api.profiles.get(username) });
@@ -274,6 +322,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1 space-y-2">
             <h1 className="flex flex-wrap items-center gap-2 text-3xl font-bold">
+              {p.level && <LevelBadge level={p.level.level} />}
               {p.user.displayName || p.user.username}
               {p.user.role !== 'USER' && <Badge tone="accent">{t(`roles.${p.user.role}`)}</Badge>}
             </h1>
@@ -287,6 +336,24 @@ export default function ProfilePage() {
               </p>
             )}
             {p.user.bio && <Markdown>{p.user.bio}</Markdown>}
+            {!p.restricted && (
+              <p className="flex flex-wrap gap-3 text-sm">
+                <Link to={`/u/${p.user.username}/achievements`} className="inline-flex items-center gap-1 text-accent hover:underline">
+                  <Trophy className="size-4" />
+                  {t('achievements.title')}
+                </Link>
+                <Link to={p.relation === 'self' ? '/stats' : `/u/${p.user.username}/stats`} className="inline-flex items-center gap-1 text-accent hover:underline">
+                  <BarChart3 className="size-4" />
+                  {t('nav.stats')}
+                </Link>
+                {p.relation === 'friends' && settings?.features.market && (
+                  <Link to={`/trade/${p.user.username}`} className="inline-flex items-center gap-1 text-accent hover:underline">
+                    <ArrowLeftRight className="size-4" />
+                    {t('cards.offerTrade')}
+                  </Link>
+                )}
+              </p>
+            )}
             {actions}
             {p.relation === 'self' && (
               <Link to="/account#profile" className="inline-flex items-center gap-1 text-sm text-accent hover:underline">

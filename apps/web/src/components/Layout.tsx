@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Activity, CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, Users, UsersRound, X, XCircle } from 'lucide-react';
+import { Activity, BarChart3, Camera, Cloud, Gamepad2, Gift, Home, Layers, Package, CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, Users, UsersRound, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -46,7 +46,7 @@ function useClickOutside(ref: React.RefObject<HTMLElement | null>, onOutside: ()
 
 function UserMenu() {
   const { t, i18n } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, logout, settings } = useAuth();
   const { mode, setMode } = useTheme();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -73,11 +73,43 @@ function UserMenu() {
         <ChevronDown className="size-4 text-muted" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-40 mt-2 w-60 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+        <div role="menu" className="absolute right-0 z-40 mt-2 max-h-[calc(100vh-5rem)] w-60 overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
           {user ? (
             <div className="border-b border-border p-1">
               <MenuLink to={`/u/${user.username}`} icon={<User className="size-4" />} onClick={() => setOpen(false)}>
                 {t('nav.profile')}
+              </MenuLink>
+              {settings?.features.cards && (
+                <MenuLink to="/inventory" icon={<Layers className="size-4" />} onClick={() => setOpen(false)}>
+                  {t('nav.inventory')}
+                </MenuLink>
+              )}
+              <MenuLink to="/stats" icon={<BarChart3 className="size-4" />} onClick={() => setOpen(false)}>
+                {t('nav.stats')}
+              </MenuLink>
+              {settings?.features.workshop && (
+                <MenuLink to="/workshop" icon={<Package className="size-4" />} onClick={() => setOpen(false)}>
+                  {t('nav.workshop')}
+                </MenuLink>
+              )}
+              {settings?.features.cloudSaves && (
+                <MenuLink to="/cloud" icon={<Cloud className="size-4" />} onClick={() => setOpen(false)}>
+                  {t('nav.cloud')}
+                </MenuLink>
+              )}
+              <MenuLink to="/family" icon={<Home className="size-4" />} onClick={() => setOpen(false)}>
+                {t('nav.family')}
+              </MenuLink>
+              <MenuLink to="/gifts" icon={<Gift className="size-4" />} onClick={() => setOpen(false)}>
+                {t('nav.gifts')}
+              </MenuLink>
+              {isDesktop && (
+                <MenuLink to="/screenshots" icon={<Camera className="size-4" />} onClick={() => setOpen(false)}>
+                  {t('screenshots.title')}
+                </MenuLink>
+              )}
+              <MenuLink to="/big-picture" icon={<Gamepad2 className="size-4" />} onClick={() => setOpen(false)}>
+                {t('nav.bigPicture')}
               </MenuLink>
               <MenuLink to="/account" icon={<Settings className="size-4" />} onClick={() => setOpen(false)}>
                 {t('nav.account')}

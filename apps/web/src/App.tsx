@@ -37,7 +37,24 @@ const ChatPage = lazy(() => import('./pages/chat/ChatPage'));
 const GroupPage = lazy(() => import('./pages/groups/GroupPage'));
 const GroupsPage = lazy(() => import('./pages/groups/GroupsPage'));
 
+// Phase 4
+const InventoryPage = lazy(() => import('./pages/cards/InventoryPage'));
+const TradePage = lazy(() => import('./pages/cards/TradePage'));
+const WorkshopItemPage = lazy(() => import('./pages/workshop/WorkshopItemPage'));
+const MyWorkshopPage = lazy(() => import('./pages/workshop/MyWorkshopPage'));
+const FamilyPage = lazy(() => import('./pages/family/FamilyPage'));
+const GiftsPage = lazy(() => import('./pages/family/GiftsPage'));
+const CloudPage = lazy(() => import('./pages/cloud/CloudPage'));
+const StatsPage = lazy(() => import('./pages/stats/StatsPage'));
+const YearReviewPage = lazy(() => import('./pages/stats/YearReviewPage'));
+const ChartsPage = lazy(() => import('./pages/stats/ChartsPage'));
+const UserAchievementsPage = lazy(() => import('./pages/achievements/AchievementList'));
+const BigPicturePage = lazy(() => import('./pages/bigpicture/BigPicturePage'));
+const OverlayPage = lazy(() => import('./desktop/OverlayPage'));
+const ScreenshotsPage = lazy(() => import('./desktop/ScreenshotsPage'));
+
 const lazyPage = (el: React.ReactNode) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
+const authed = (el: React.ReactNode) => <RequireAuth>{lazyPage(el)}</RequireAuth>;
 
 export default function App() {
   const { settings, user, loading, offline } = useAuth();
@@ -51,6 +68,8 @@ export default function App() {
   return (
     <Routes>
       {isDesktop && <Route path="/server-setup" element={<ServerSetupPage />} />}
+      {isDesktop && <Route path="/overlay/*" element={authed(<OverlayPage />)} />}
+      {!blocked && <Route path="/big-picture" element={authed(<BigPicturePage />)} />}
       <Route element={<Layout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -73,6 +92,23 @@ export default function App() {
             <Route path="/chat/:id" element={<RequireAuth>{lazyPage(<ChatPage />)}</RequireAuth>} />
             <Route path="/activity" element={<RequireAuth><FeedPage /></RequireAuth>} />
             <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
+            <Route path="/inventory" element={authed(<InventoryPage />)} />
+            <Route path="/inventory/:tab" element={authed(<InventoryPage />)} />
+            <Route path="/trade/:username" element={authed(<TradePage />)} />
+            <Route path="/workshop" element={authed(<MyWorkshopPage />)} />
+            <Route path="/workshop/:id" element={lazyPage(<WorkshopItemPage />)} />
+            <Route path="/family" element={authed(<FamilyPage />)} />
+            <Route path="/gifts" element={authed(<GiftsPage />)} />
+            <Route path="/redeem" element={authed(<GiftsPage />)} />
+            <Route path="/cloud" element={authed(<CloudPage />)} />
+            <Route path="/stats" element={authed(<StatsPage />)} />
+            <Route path="/year" element={authed(<YearReviewPage />)} />
+            <Route path="/year/:year" element={authed(<YearReviewPage />)} />
+            <Route path="/charts" element={lazyPage(<ChartsPage />)} />
+            <Route path="/u/:username/stats" element={lazyPage(<StatsPage />)} />
+            <Route path="/u/:username/year/:year" element={lazyPage(<YearReviewPage />)} />
+            <Route path="/u/:username/achievements" element={lazyPage(<UserAchievementsPage />)} />
+            {isDesktop && <Route path="/screenshots" element={authed(<ScreenshotsPage />)} />}
             <Route path="/u/:username" element={<ProfilePage />} />
             <Route path="/client" element={<ClientDownloadPage />} />
             <Route path="/desktop-link" element={<RequireAuth><DesktopLinkPage /></RequireAuth>} />

@@ -72,6 +72,43 @@ import type {
   ShowcaseConfig,
   UserSearchResult,
 } from './social.js';
+import type {
+  AchievementDetection,
+  AchievementUnlockResult,
+  ActivationCodeDto,
+  AdminAchievementDto,
+  CardItemDto,
+  CloudSaveDto,
+  CloudSaveFile,
+  CloudSaveOverview,
+  CloudSaveStatus,
+  FamilyDto,
+  FamilyInviteDto,
+  FamilyLibraryEntry,
+  FamilyRole,
+  GameAchievements,
+  GameBadgeDto,
+  GameNoteDto,
+  GameRef,
+  GiftDto,
+  InventoryDto,
+  MarketListingDto,
+  ParentalSettings,
+  ParentalStatus,
+  PlayStartResponse,
+  PlaytimeStats,
+  ProfileLevel,
+  RemoteDeviceDto,
+  TopLists,
+  TradeOfferDto,
+  TradingCardDto,
+  WorkshopCommentDto,
+  WorkshopItemDto,
+  WorkshopKind,
+  WorkshopSubscriptionDto,
+  WorkshopVersionDto,
+  YearReview,
+} from './steam.js';
 
 export class ApiError extends Error {
   constructor(
@@ -146,6 +183,9 @@ export type GameInput = Partial<{
   featured: boolean;
   genres: string[];
   tags: string[];
+  ageRating: number;
+  savePaths: import('./steam.js').SavePathConfig[];
+  workshopPath: string | null;
 }>;
 
 export type BuildInput = Partial<{
@@ -191,6 +231,15 @@ export interface AdminUploadDto {
   game: { id: string; title: string };
   version: string;
   platform: Platform;
+}
+
+export interface AchievementInput {
+  apiName?: string;
+  name?: string;
+  description?: string;
+  hidden?: boolean;
+  progressMax?: number | null;
+  detection?: AchievementDetection | null;
 }
 
 export interface GroupInput {
@@ -611,6 +660,137 @@ export class ApiClient {
     like: (id: string) => this.put<{ likes: number; liked: boolean }>(`/community/items/${id}/like`),
     unlike: (id: string) => this.del<{ likes: number; liked: boolean }>(`/community/items/${id}/like`),
     news: (gameId: string) => this.get<AnnouncementDto[]>(`/community/games/${gameId}/news`),
+  };
+
+  // ---- Phase 4: Steam-Funktionen ----
+  cloud = {
+    list: () => this.get<CloudSaveOverview[]>('/cloud'),
+    status: (gameId: string) => this.get<CloudSaveStatus>(`/cloud/${gameId}`),
+    version: (gameId: string, version: number) => this.get<CloudSaveDto & { manifest: CloudSaveFile[] }>(`/cloud/${gameId}/versions/${version}`),
+    downloadUrl: (gameId: string, version: number) => `${this.baseUrl}/api/cloud/${gameId}/versions/${version}/download`,
+    restore: (gameId: string, version: number) => this.post<CloudSaveDto>(`/cloud/${gameId}/versions/${version}/restore`),
+    remove: (gameId: string) => this.del<{ ok: true; deleted: number }>(`/cloud/${gameId}`),
+  };
+
+  achievements = {
+    forGame: (gameIdOrSlug: string) => this.get<GameAchievements>(`/achievements/games/${encodeURIComponent(gameIdOrSlug)}`),
+    forUser: (username: string) => this.get<(GameAchievements & { lastUnlockedAt: string | null })[]>(`/achievements/users/${encodeURIComponent(username)}`),
+    detect: (gameId: string, apiName: string) => this.post<AchievementUnlockResult>('/achievements/detect', { gameId, apiName }),
+    manage: (gameId: string) => this.get<AdminAchievementDto[]>(`/achievements/manage/${gameId}`),
+    create: (gameId: string, data: AchievementInput & { apiName: string; name: string }) => this.post<AdminAchievementDto[]>(`/achievements/manage/${gameId}`, data),
+    update: (gameId: string, id: string, data: AchievementInput) => this.patch<AdminAchievementDto[]>(`/achievements/manage/${gameId}/${id}`, data),
+    remove: (gameId: string, id: string) => this.del<AdminAchievementDto[]>(`/achievements/manage/${gameId}/${id}`),
+    uploadIcon: (gameId: string, id: string, file: Blob) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<AdminAchievementDto[]>('POST', `/achievements/manage/${gameId}/${id}/icon`, { body: fd });
+    },
+    order: (gameId: string, ids: string[]) => this.put<AdminAchievementDto[]>(`/achievements/manage/${gameId}/order`, { ids }),
+    grant: (gameId: string, id: string, username: string) => this.post<AchievementUnlockResult>(`/achievements/manage/${gameId}/${id}/users/${encodeURIComponent(username)}`),
+    revoke: (gameId: string, id: string, username: string) => this.del<{ ok: true }>(`/achievements/manage/${gameId}/${id}/users/${encodeURIComponent(username)}`),
+  };
+
+  play = {
+    start: (gameId: string) => this.post<PlayStartResponse>(`/play/${gameId}/start`),
+    parental: () => this.get<ParentalStatus>('/me/parental'),
+  };
+
+  workshop = {
+    list: (gameIdOrSlug: string, q: { q?: string; kind?: WorkshopKind; sort?: 'popular' | 'recent' | 'rating'; page?: number; pageSize?: number } = {}) =>
+      this.get<{ items: WorkshopItemDto[]; total: number; enabled: boolean }>(`/workshop/games/${encodeURIComponent(gameIdOrSlug)}`, q as Query),
+    item: (id: string) => this.get<WorkshopItemDto & { versions: WorkshopVersionDto[] }>(`/workshop/items/${id}`),
+    create: (gameId: string, data: { title: string; description?: string; kind?: WorkshopKind; tags?: string[] }) => this.post<WorkshopItemDto>(`/workshop/games/${gameId}`, data),
+    update: (id: string, data: { title?: string; description?: string; kind?: WorkshopKind; tags?: string[] }) => this.patch<WorkshopItemDto>(`/workshop/items/${id}`, data),
+    remove: (id: string) => this.del<{ ok: true }>(`/workshop/items/${id}`),
+    moderate: (id: string, hidden: boolean) => this.post<WorkshopItemDto>(`/workshop/items/${id}/moderate`, { hidden }),
+    uploadPreview: (id: string, file: Blob) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<WorkshopItemDto>('POST', `/workshop/items/${id}/preview`, { body: fd });
+    },
+    uploadVersion: (id: string, file: Blob, filename: string, version: string, changelog = '') => {
+      const fd = new FormData();
+      fd.append('file', file, filename);
+      return this.request<WorkshopVersionDto>('POST', `/workshop/items/${id}/versions`, { body: fd, query: { version, changelog } });
+    },
+    deleteVersion: (id: string, versionId: string) => this.del<{ ok: true }>(`/workshop/items/${id}/versions/${versionId}`),
+    rate: (id: string, up: boolean | null) => this.put<WorkshopItemDto>(`/workshop/items/${id}/rating`, { up }),
+    subscribe: (id: string) => this.put<WorkshopItemDto>(`/workshop/items/${id}/subscription`),
+    unsubscribe: (id: string) => this.del<{ ok: true }>(`/workshop/items/${id}/subscription`),
+    subscriptions: (gameId?: string) => this.get<WorkshopSubscriptionDto[]>('/workshop/subscriptions', { gameId }),
+    mine: () => this.get<{ published: WorkshopItemDto[]; subscribed: WorkshopItemDto[] }>('/workshop/mine'),
+    comments: (id: string) => this.get<WorkshopCommentDto[]>(`/workshop/items/${id}/comments`),
+    comment: (id: string, body: string) => this.post<WorkshopCommentDto>(`/workshop/items/${id}/comments`, { body }),
+    deleteComment: (commentId: string) => this.del<{ ok: true }>(`/workshop/comments/${commentId}`),
+  };
+
+  cards = {
+    inventory: () => this.get<InventoryDto>('/cards/inventory'),
+    userItems: (username: string) => this.get<CardItemDto[]>(`/cards/users/${encodeURIComponent(username)}/items`),
+    userBadges: (username: string) => this.get<{ level: ProfileLevel; badges: GameBadgeDto[] }>(`/cards/users/${encodeURIComponent(username)}/badges`),
+    craft: (gameId: string) => this.post<{ level: number; xp: number; profile: ProfileLevel }>(`/cards/badges/${gameId}/craft`),
+    trades: () => this.get<TradeOfferDto[]>('/cards/trades'),
+    offer: (toUserId: string, give: string[], receive: string[], message = '') => this.post<TradeOfferDto>('/cards/trades', { toUserId, give, receive, message }),
+    acceptTrade: (id: string) => this.post<TradeOfferDto>(`/cards/trades/${id}/accept`),
+    declineTrade: (id: string) => this.post<{ ok: true }>(`/cards/trades/${id}/decline`),
+    cancelTrade: (id: string) => this.post<{ ok: true }>(`/cards/trades/${id}/cancel`),
+    market: (q: { gameId?: string; mine?: boolean; fulfillable?: boolean } = {}) => this.get<MarketListingDto[]>('/cards/market', q as Query),
+    list: (itemId: string, wantCardId: string) => this.post<MarketListingDto>('/cards/market', { itemId, wantCardId }),
+    fulfil: (id: string) => this.post<{ ok: true }>(`/cards/market/${id}/fulfil`),
+    unlist: (id: string) => this.del<{ ok: true }>(`/cards/market/${id}`),
+    manage: (gameId: string) => this.get<(TradingCardDto & { sortOrder: number; inCirculation: number })[]>(`/cards/manage/${gameId}`),
+    createCard: (gameId: string, name: string) => this.post<(TradingCardDto & { sortOrder: number; inCirculation: number })[]>(`/cards/manage/${gameId}`, { name }),
+    renameCard: (gameId: string, id: string, name: string) => this.patch<(TradingCardDto & { sortOrder: number; inCirculation: number })[]>(`/cards/manage/${gameId}/${id}`, { name }),
+    deleteCard: (gameId: string, id: string) => this.del<(TradingCardDto & { sortOrder: number; inCirculation: number })[]>(`/cards/manage/${gameId}/${id}`),
+    uploadCardImage: (gameId: string, id: string, file: Blob) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<(TradingCardDto & { sortOrder: number; inCirculation: number })[]>('POST', `/cards/manage/${gameId}/${id}/image`, { body: fd });
+    },
+  };
+
+  family = {
+    get: () => this.get<FamilyDto | null>('/family'),
+    create: (name: string) => this.post<FamilyDto>('/family', { name }),
+    rename: (name: string) => this.patch<FamilyDto>('/family', { name }),
+    invite: (username: string, role: FamilyRole) => this.post<FamilyDto>('/family/invites', { username, role }),
+    invites: () => this.get<FamilyInviteDto[]>('/family/invites'),
+    acceptInvite: (id: string) => this.post<FamilyDto>(`/family/invites/${id}/accept`),
+    deleteInvite: (id: string) => this.del<{ ok: true }>(`/family/invites/${id}`),
+    updateMember: (userId: string, data: Partial<ParentalSettings> & { role?: FamilyRole }) => this.patch<FamilyDto>(`/family/members/${userId}`, data),
+    removeMember: (userId: string) => this.del<{ ok: true }>(`/family/members/${userId}`),
+    library: () => this.get<FamilyLibraryEntry[]>('/family/library'),
+  };
+
+  gifts = {
+    list: () => this.get<{ received: GiftDto[]; sent: GiftDto[] }>('/gifts'),
+    send: (gameId: string, toUserId: string, message = '') => this.post<GiftDto>('/gifts', { gameId, toUserId, message }),
+    accept: (id: string) => this.post<GiftDto>(`/gifts/${id}/accept`),
+    remove: (id: string) => this.del<{ ok: true }>(`/gifts/${id}`),
+    redeem: (code: string) => this.post<{ game: GameRef }>('/codes/redeem', { code }),
+    codes: (gameId: string, batch?: string) => this.get<ActivationCodeDto[]>(`/codes/manage/${gameId}`, { batch }),
+    createCodes: (gameId: string, data: { count: number; batch?: string; note?: string; maxUses?: number; expiresAt?: string | null }) =>
+      this.post<ActivationCodeDto[]>(`/codes/manage/${gameId}`, data),
+    revokeCode: (gameId: string, id: string, revoked: boolean) => this.patch<{ ok: true }>(`/codes/manage/${gameId}/${id}`, { revoked }),
+    exportUrl: (gameId: string, batch?: string) => `${this.baseUrl}/api/codes/manage/${gameId}/export${buildQuery({ batch })}`,
+  };
+
+  stats = {
+    me: (weeks = 12) => this.get<PlaytimeStats>('/stats/me', { weeks }),
+    user: (username: string, weeks = 12) => this.get<PlaytimeStats>(`/stats/users/${encodeURIComponent(username)}`, { weeks }),
+    myYear: (year: number) => this.get<YearReview>(`/stats/me/year/${year}`),
+    userYear: (username: string, year: number) => this.get<YearReview>(`/stats/users/${encodeURIComponent(username)}/year/${year}`),
+    top: (period: TopLists['period'] = 'month') => this.get<TopLists>('/stats/top', { period }),
+  };
+
+  devices = {
+    list: () => this.get<RemoteDeviceDto[]>('/devices'),
+    command: (sessionId: string, action: 'install' | 'launch', gameId: string) => this.post<{ ok: true }>(`/devices/${sessionId}/command`, { action, gameId }),
+  };
+
+  notes = {
+    get: (gameId: string) => this.get<GameNoteDto>(`/notes/${gameId}`),
+    save: (gameId: string, body: string) => this.put<GameNoteDto>(`/notes/${gameId}`, { body }),
   };
 
   private socket: WebSocket | null = null;

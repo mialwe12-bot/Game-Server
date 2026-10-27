@@ -13,9 +13,24 @@ import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatDate, formatDateTime, formatPlaytime } from '../../lib/format';
 import { toast } from '../../lib/toast';
+import { GameAchievementsTab } from '../achievements/AchievementList';
+import { WorkshopTab } from '../workshop/WorkshopTab';
 
-export type GameTab = 'store' | 'reviews' | 'forum' | 'screenshots' | 'artwork' | 'guides' | 'news';
-const TABS: GameTab[] = ['store', 'reviews', 'forum', 'screenshots', 'artwork', 'guides', 'news'];
+export type GameTab = 'store' | 'achievements' | 'reviews' | 'forum' | 'workshop' | 'screenshots' | 'artwork' | 'guides' | 'news';
+
+function tabsFor(game: GameDetail): GameTab[] {
+  return [
+    'store',
+    ...(game.achievementCount > 0 ? (['achievements'] as const) : []),
+    'reviews',
+    'forum',
+    ...(game.workshopPath || game.workshopCount > 0 ? (['workshop'] as const) : []),
+    'screenshots',
+    'artwork',
+    'guides',
+    'news',
+  ];
+}
 
 export function ScoreBadge({ summary }: { summary: ReviewSummary }) {
   const { t } = useTranslation();
@@ -35,7 +50,7 @@ export function GameTabs({ game, tab }: { game: GameDetail; tab: GameTab }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border">
       <nav className="scrollbar-thin -mb-px flex gap-1 overflow-x-auto">
-        {TABS.map((id) => (
+        {tabsFor(game).map((id) => (
           <Link
             key={id}
             to={id === 'store' ? `/game/${game.slug}` : `/game/${game.slug}/${id}`}
@@ -59,6 +74,10 @@ export function GameTabs({ game, tab }: { game: GameDetail; tab: GameTab }) {
 
 export function GameCommunity({ game, tab, topicId }: { game: GameDetail; tab: GameTab; topicId?: string }) {
   switch (tab) {
+    case 'achievements':
+      return <GameAchievementsTab game={game} />;
+    case 'workshop':
+      return <WorkshopTab game={game} />;
     case 'reviews':
       return <Reviews game={game} />;
     case 'forum':

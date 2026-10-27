@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { MeResponse, NotificationDto, WsEvent } from '@gameserver/shared';
-import { desktop, isDesktop } from '../desktop/bridge';
+import { desktop, isDesktop, isOverlayWindow } from '../desktop/bridge';
 import i18n from '../i18n';
 import { toast } from './toast';
 
@@ -49,7 +49,13 @@ export async function requestBrowserNotifications(): Promise<boolean> {
 }
 
 function attention(title: string, body: string, toastText = body ? `${title}: ${body}` : title) {
-  if (typeof document !== 'undefined' && document.hidden) systemNotify(title, body);
+  const hidden = typeof document !== 'undefined' && document.hidden;
+  // Das Overlay-Fenster zeigt nur Toasts, wenn es sichtbar ist – Systembenachrichtigungen kommen vom Hauptfenster
+  if (isOverlayWindow) {
+    if (!hidden) toast.info(toastText);
+    return;
+  }
+  if (hidden) systemNotify(title, body);
   else toast.info(toastText);
 }
 
@@ -82,6 +88,20 @@ export function handleSocialEvent(e: WsEvent, qc: QueryClient): void {
     }
     case 'chat.conversation':
       void qc.invalidateQueries({ queryKey: ['chat'] });
+      break;
+    // Phase 4
+    case 'achievement.unlocked':
+      void qc.invalidateQueries({ queryKey: ['achievements'] });
+      attention(i18n.t('achievements.unlockedToast'), `${e.data.achievement.name} · ${e.data.game.title}`);
+      break;
+    case 'inventory.changed':
+      void qc.invalidateQueries({ queryKey: ['cards'] });
+      break;
+    case 'cloud.updated':
+      void qc.invalidateQueries({ queryKey: ['cloud'] });
+      break;
+    case 'workshop.updated':
+      void qc.invalidateQueries({ queryKey: ['workshop'] });
       break;
     default:
       break;

@@ -24,6 +24,20 @@ export interface DesktopConfig {
   autostart: boolean;
   notifications: boolean;
   defaultRunnerId: string | null;
+  // Phase 4
+  /** Cloud-Saves beim Start/Ende automatisch synchronisieren */
+  cloudSync: boolean;
+  /** Abonnierte Workshop-Inhalte automatisch laden */
+  workshopAutoSync: boolean;
+  /** Globaler Hotkey für Screenshots (Tauri-Syntax, z. B. "F12") */
+  screenshotHotkey: string;
+  /** Globaler Hotkey für das Overlay-Fenster (z. B. "Shift+Tab") */
+  overlayHotkey: string;
+  overlayEnabled: boolean;
+  /** Discord Rich Presence (benötigt Discord-App-ID in den Server-Einstellungen) */
+  discordRpc: boolean;
+  /** Im Big-Picture-Modus starten (Steam Deck/Gaming-Mode: immer) */
+  startInBigPicture: boolean;
 }
 
 export interface PlatformInfo {
@@ -145,4 +159,98 @@ export const DESKTOP_EVENTS = {
   running: 'gs://running',
   authToken: 'gs://auth-token',
   launchRequest: 'gs://launch-request',
+  // Phase 4
+  cloud: 'gs://cloud',
+  screenshot: 'gs://screenshot',
+  workshop: 'gs://workshop',
+  achievement: 'gs://achievement',
+  overlay: 'gs://overlay',
+  parental: 'gs://parental',
 } as const;
+
+// ---- Phase 4 ----
+
+export interface LocalScreenshot {
+  /** Absoluter Pfad der PNG-Datei */
+  path: string;
+  gameId: string | null;
+  gameTitle: string | null;
+  takenAt: string;
+  size: number;
+  width: number;
+  height: number;
+}
+
+export interface CloudLocalState {
+  hash: string | null;
+  files: number;
+  bytes: number;
+  /** Neueste Änderungszeit der lokalen Dateien */
+  modifiedAt: string | null;
+}
+
+export interface CloudRemoteState {
+  version: number;
+  hash: string;
+  createdAt: string;
+  deviceName: string | null;
+}
+
+export type CloudSyncStatus = 'uploaded' | 'downloaded' | 'unchanged' | 'conflict' | 'disabled' | 'no_paths' | 'error';
+
+export interface CloudSyncResult {
+  gameId: string;
+  status: CloudSyncStatus;
+  local: CloudLocalState;
+  remote: CloudRemoteState | null;
+  message: string | null;
+}
+
+export interface WorkshopSyncResult {
+  installed: number;
+  updated: number;
+  removed: number;
+  errors: string[];
+}
+
+export interface SteamUser {
+  id: string;
+  name: string;
+}
+
+export interface SteamStatus {
+  found: boolean;
+  root: string | null;
+  users: SteamUser[];
+  running: boolean;
+}
+
+export interface SyncCounts {
+  added: number;
+  updated: number;
+  removed: number;
+}
+
+export interface SunshineStatus {
+  found: boolean;
+  appsPath: string | null;
+}
+
+export interface ImportCandidate {
+  path: string;
+  gameId: string;
+  title: string;
+  versionId: string;
+  version: string;
+  buildId: string;
+  /** Dateien, deren Größe/Prüfsumme mit dem Build übereinstimmt */
+  matchedFiles: number;
+  totalFiles: number;
+  /** 0–1 */
+  confidence: number;
+}
+
+export interface ParentalTick {
+  gameId: string;
+  remainingSeconds: number;
+}

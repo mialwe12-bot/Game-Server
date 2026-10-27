@@ -21,3 +21,4 @@ export function errorMessage(err: unknown, fallback = 'Fehler'): string {
 }
 
 export { ApiError };
+export type { AchievementInput } from '@gameserver/shared';
