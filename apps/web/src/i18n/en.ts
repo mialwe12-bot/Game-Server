@@ -334,6 +334,8 @@ const en: Translation = {
       circulation: '{{count}} in circulation',
     },
     codes: {
+      hint: 'Codes add the game to the library. Redeem under “Gifts & codes”.',
+      hintRestricted: 'This game has restricted visibility: a redeemed code also grants access.',
       generate: 'Generate codes',
       count: 'Amount',
       maxUses: 'Redemptions per code',
@@ -1245,6 +1247,8 @@ const en: Translation = {
     noPublished: 'You haven\'t published anything yet.',
   },
   cloud: {
+    keptLocal: 'Local save uploaded',
+    usedRemote: 'Cloud save loaded',
     hintDesktop: 'This client syncs saves when a game starts and exits.',
     hintWeb: 'Saves are uploaded by the desktop client. You can restore older versions here.',
     title: 'Cloud saves',
@@ -1270,6 +1274,8 @@ const en: Translation = {
     useRemote: 'Load cloud save',
   },
   family: {
+    parentalWarning: '{{minutes}} minutes of playtime left today.',
+    parentalStopped: 'The daily playtime limit was reached – the game was closed.',
     title: 'Family',
     intro: 'Share restricted games with your family and set rules for children.',
     create: 'Create family',
@@ -1374,6 +1380,10 @@ const en: Translation = {
     showChart: 'Show chart',
   },
   devices: {
+    remoteInstall: 'Installation requested by {{from}}',
+    remoteLaunch: 'Launch requested by {{from}}',
+    installSent: 'Installation sent to the device',
+    launchSent: 'Launch command sent to the device',
     installOn: 'Install on my PC',
     otherDevice: 'On another device',
     title: 'On another device',

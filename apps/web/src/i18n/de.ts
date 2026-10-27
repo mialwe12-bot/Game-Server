@@ -332,6 +332,8 @@ const de = {
       circulation: '{{count}} im Umlauf',
     },
     codes: {
+      hint: 'Codes fügen das Spiel der Bibliothek hinzu. Einlösen unter „Geschenke & Codes“.',
+      hintRestricted: 'Das Spiel ist eingeschränkt sichtbar: Ein eingelöster Code gewährt zusätzlich Zugriff.',
       generate: 'Codes erzeugen',
       count: 'Anzahl',
       maxUses: 'Einlösungen je Code',
@@ -1244,6 +1246,8 @@ const de = {
     noPublished: 'Du hast noch nichts veröffentlicht.',
   },
   cloud: {
+    keptLocal: 'Lokaler Spielstand hochgeladen',
+    usedRemote: 'Cloud-Spielstand geladen',
     hintDesktop: 'Dieser Client synchronisiert Spielstände beim Start und Beenden eines Spiels.',
     hintWeb: 'Spielstände werden vom Desktop-Client hochgeladen. Hier kannst du ältere Versionen wiederherstellen.',
     title: 'Cloud-Spielstände',
@@ -1269,6 +1273,8 @@ const de = {
     useRemote: 'Cloud-Stand laden',
   },
   family: {
+    parentalWarning: 'Noch {{minutes}} Minuten Spielzeit für heute.',
+    parentalStopped: 'Das tägliche Spielzeitlimit ist erreicht – das Spiel wurde beendet.',
     title: 'Familie',
     intro: 'Teile eingeschränkte Spiele mit deiner Familie und lege Regeln für Kinder fest.',
     create: 'Familie gründen',
@@ -1373,6 +1379,10 @@ const de = {
     showChart: 'Als Diagramm',
   },
   devices: {
+    remoteInstall: 'Installation angefordert von {{from}}',
+    remoteLaunch: 'Spielstart angefordert von {{from}}',
+    installSent: 'Installation an das Gerät gesendet',
+    launchSent: 'Startbefehl an das Gerät gesendet',
     installOn: 'Auf meinem PC installieren',
     otherDevice: 'Auf anderem Gerät',
     title: 'Auf anderem Gerät',

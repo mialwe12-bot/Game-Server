@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DESKTOP_EVENTS, type CloudSyncResult, type DesktopConfig, type DownloadJob, type InstalledGame, type LocalScreenshot, type PlatformInfo, type RunningGame } from '@gameserver/shared';
+import { DESKTOP_EVENTS, type CloudSyncResult, type DesktopConfig, type DownloadJob, type InstalledGame, type LocalScreenshot, type ParentalTick, type PlatformInfo, type RunningGame } from '@gameserver/shared';
 import i18n from '../i18n';
 import { CloudConflictDialog } from './CloudConflictDialog';
 import { api } from '../lib/api';
@@ -87,6 +87,12 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
       }),
       desktop.on<LocalScreenshot>(DESKTOP_EVENTS.screenshot, (shot) => {
         if (!isOverlayWindow) toast.success(i18n.t('screenshots.taken', { title: shot.gameTitle ?? '' }));
+      }),
+      // Kindersicherung: Warnung kurz vor dem Tageslimit bzw. Spielende
+      desktop.on<ParentalTick>(DESKTOP_EVENTS.parental, (p) => {
+        if (isOverlayWindow) return;
+        if (p.remainingSeconds > 0) toast.info(i18n.t('family.parentalWarning', { minutes: Math.ceil(p.remainingSeconds / 60) }));
+        else toast.error(i18n.t('family.parentalStopped'));
       }),
     ];
     // Start über Verknüpfung, der beim Hochfahren nicht direkt gelang
