@@ -57,6 +57,33 @@ services:
     networks:
       - reverse-proxy
 
+  # Optional: eigener STUN/TURN-Server für den Sprachchat (über das Internet, hinter NAT).
+  # Start: docker compose --profile voice up -d ; in .env WEBRTC_STUN_URLS/WEBRTC_TURN_URLS/WEBRTC_TURN_SECRET setzen.
+  # Ports 3478/udp+tcp und 49160-49200/udp in der Firewall freigeben.
+  coturn:
+    image: coturn/coturn:4.6
+    profiles: ["voice"]
+    container_name: gameserver-coturn
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --min-port=49160
+      - --max-port=49200
+      - --use-auth-secret
+      - --static-auth-secret=${WEBRTC_TURN_SECRET:?WEBRTC_TURN_SECRET in .env setzen}
+      - --realm=${TURN_REALM:-gameserver}
+      - --fingerprint
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --no-multicast-peers
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+
 networks:
   internal: {}
   reverse-proxy:

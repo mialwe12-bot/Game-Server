@@ -39,14 +39,24 @@ fortsetzbare Upload aus `packages/shared` werden wiederverwendet.
 | – | Auto-Update des Clients über den eigenen Server | Tauri-Updater-Endpunkt am Server (`/api/client/update/...`) + Admin-Upload der signierten Client-Releases | Signaturschlüssel muss der Betreiber selbst erzeugen |
 | – | Tests | Rust-Unit-/Integrationstests für den Download-Manager (Range, Resume, Prüfsumme, Warteschlange, Drosselung) gegen einen Test-HTTP-Server | |
 
-## Phase 3 – Soziales
+## ✅ Phase 3 – Soziales (fertig)
 
-Freunde, Anfragen, Online-Status/„spielt gerade“, Blockieren, anpassbare Profile; Chat (direkt, Gruppen, Kanäle, Bilder, Emojis,
-optional GIFs), optional Sprachchat per WebRTC; Gruppen mit Seiten/Ankündigungen/Events; Community pro Spiel (Reviews mit
-Hilfreich-Votes, Foren, Screenshots, Guides, Artwork, News); Benachrichtigungen (In-App, Client, E-Mail), Aktivitäts-Feed.
+- **Freunde**: Anfragen (Suche/Profil), gegenseitige Anfrage = sofort befreundet, Entfernen, **Blockieren**, Anfragen abschaltbar,
+  **Präsenz** (online, „spielt gerade“ vom Desktop-Client über `PUT /api/presence`, zuletzt online), **Spieleinladungen**
+- **Profile**: Hintergrundbild, Akzentfarbe, bis zu 6 Vitrinen, berechnete **Abzeichen** mit Stufen, Statistiken, Aktivitäten,
+  Privatsphäre (alle/Freunde/privat)
+- **Chat**: Direkt (nur Freunde), Gruppenchats, Gruppenkanäle; Text, Emojis, Bilder (signierte URLs), GIFs (Tenor, optional),
+  Bearbeiten/Löschen, Lesestatus, Tippanzeige, Stummschalten; **Sprachchat** als WebRTC-Mesh mit Signalisierung über `/api/ws`
+- **Gruppen**: Seite mit Banner/Bild, Beitrittsregeln (offen/Anfrage/Einladung), sichtbar/versteckt, Rollen und Leitungsübergabe,
+  Ankündigungen, Events mit Zusagen und Erinnerung, Chat-Kanäle (Mitgliedschaft synchronisiert)
+- **Community pro Spiel**: Reviews (nur mit Bibliothekseintrag) mit Hilfreich/Lustig-Stimmen und Bewertungsstufe, Forum mit
+  Moderation (Admin/Maintainer), Screenshots, Artworks, Guides, Likes, News
+- **Benachrichtigungen**: In-App + WebSocket, Systembenachrichtigungen im Client (`show_notification`), Browser-Notifications,
+  E-Mail nur offline und pro Kategorie abschaltbar; **Aktivitäts-Feed**
+- Optionaler **coturn**-Container (`docker compose --profile voice`), TURN-Zugangsdaten per HMAC
 
-> Hinweis: **Sprachchat** benötigt für Nutzer hinter NAT einen TURN-Server (z. B. coturn als zusätzlicher Container).
-> GIF-Suche (Tenor/Giphy) wäre eine externe Abhängigkeit und bleibt deshalb optional/abschaltbar.
+Bewusste Einschränkungen: Sprachchat-Mesh für kleine Runden (≤ ~6), kein eigener Medienserver; GIF-Suche nur mit Tenor-Schlüssel;
+Abzeichen nur aus Meilensteinen (Sammelkarten/Level in Phase 4).
 
 ## Phase 4 – Steam-Features
 

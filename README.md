@@ -11,7 +11,7 @@ die Nutzer kostenlos; die Plattform verteilt DRM-freie Spiele, die du selbst hoc
 | Gemeinsame Typen + API-Client + fortsetzbarer Upload | TypeScript | `packages/shared` |
 | Desktop-Client (Windows/Linux, Tauri 2 + Rust) | eigenes Repository [`mialwe12-bot/game-client`](https://github.com/mialwe12-bot/game-client), nutzt `apps/web` als Submodul | – |
 
-> **Status:** Phase 1 (Server, Web-Store, Admin-Panel) und Phase 2 (Desktop-Client-Kern) sind fertig.
+> **Status:** Phase 1 (Server, Web-Store, Admin-Panel), Phase 2 (Desktop-Client-Kern) und Phase 3 (Soziales) sind fertig.
 > Siehe [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
@@ -19,6 +19,7 @@ die Nutzer kostenlos; die Plattform verteilt DRM-freie Spiele, die du selbst hoc
 ## Inhalt
 
 - [Funktionen (Phase 1)](#funktionen-phase-1)
+- [Soziale Funktionen (Phase 3)](#soziale-funktionen-phase-3)
 - [Schnellstart mit Docker Compose + Caddy](#schnellstart-mit-docker-compose--caddy)
 - [Erster Admin (Seed-Skript)](#erster-admin-seed-skript)
 - [Konfiguration](#konfiguration)
@@ -84,6 +85,74 @@ die Nutzer kostenlos; die Plattform verteilt DRM-freie Spiele, die du selbst hoc
 **Allgemein**
 - Responsive, Dark/Light/System-Theme, Deutsch/Englisch
 - REST-API mit **OpenAPI 3** (`/api/openapi.json`, Swagger-UI unter `/api/docs`) und **WebSocket** (`/api/ws`)
+
+---
+
+## Soziale Funktionen (Phase 3)
+
+**Freunde & Präsenz**
+- Freundschaftsanfragen (per Suche oder Profil), annehmen/ablehnen/zurückziehen, gegenseitige Anfrage = sofort befreundet
+- **Online-Status** und **„spielt gerade …“** (meldet der Desktop-Client beim Spielstart), „zuletzt online“
+- Freunde zu einem Spiel **einladen**, Nutzer **blockieren** (beendet Freundschaft, verhindert Anfragen, Chat, Einladungen und Suche)
+- Freundschaftsanfragen lassen sich im Profil abschalten
+
+**Profile**
+- Hintergrundbild, Akzentfarbe, bis zu sechs **Vitrinen** (Lieblingsspiel, Statistiken, zuletzt gespielt, Screenshots, Reviews,
+  Gruppen, Abzeichen, Freitext in Markdown)
+- **Abzeichen** aus Meilensteinen (Sammler, Vielspieler, Kritiker, Gesellig, Fotograf, Veteran – je mit Stufen),
+  **Statistiken** und **Aktivitäten**
+- Privatsphäre: Profil für alle, nur Freunde oder nur mich
+
+**Chat**
+- **Direktnachrichten** (nur unter Freunden), **Gruppenchats** (bis 50 Personen) und **Kanäle** in Gruppen
+- Text mit Links, **Emoji-Auswahl**, **Bilder** (Upload oder Einfügen aus der Zwischenablage), optional **GIFs** (Tenor),
+  Bearbeiten/Löschen, Lesestatus/Ungelesen-Zähler, Tipp-Anzeige, Stummschalten
+- Optionaler **Sprachchat** (WebRTC) in jeder Unterhaltung – siehe [Sprachchat](#sprachchat-webrtc)
+
+**Gruppen**
+- Gruppenseite mit Banner, Bild, Beschreibung (Markdown); offen, auf Anfrage oder nur auf Einladung; öffentlich oder versteckt
+- Rollen Gründer/Moderator/Mitglied, Leitung übertragen, Einladungen, Beitrittsanfragen
+- **Ankündigungen**, **Events** (mit Spiel, Zusagen „dabei/vielleicht/kann nicht“ und automatischer **Erinnerung** ~1 h vorher),
+  **Chat-Kanäle** (Mitgliedschaft folgt automatisch der Gruppe)
+
+**Community pro Spiel** (Tabs auf der Spieleseite)
+- **Reviews** (Daumen hoch/runter + Text, nur mit Spiel in der Bibliothek, Spielzeit zum Zeitpunkt des Reviews), Bewertung
+  „hilfreich/nicht hilfreich/lustig“, Gesamtbewertung („Sehr positiv“, „Ausgeglichen“ …)
+- **Forum** mit Themen, Antworten (Markdown), Anheften/Schließen/Löschen durch Admins und Maintainer des Spiels
+- **Screenshots**, **Artworks** und **Guides** (Markdown) mit „Gefällt mir“, **News** (Ankündigungen zum Spiel)
+
+**Benachrichtigungen & Feed**
+- In-App (Glocke, Live per WebSocket), im Desktop-Client als **Systembenachrichtigung**, im Browser optional per
+  Notification-API, per **E-Mail** (nur wenn offline; pro Kategorie abschaltbar)
+- **Aktivitäts-Feed** mit eigenen Aktivitäten und denen von Freunden
+
+### Sprachchat (WebRTC)
+
+Der Sprachchat ist ein **Mesh** – jeder Teilnehmer verbindet sich direkt mit jedem anderen; der Server vermittelt nur die
+Signalisierung über den WebSocket. Das ist ohne Medienserver betreibbar und eignet sich gut für **bis ca. 6 Personen**.
+
+1. In **Verwaltung → Einstellungen → Soziales** „Sprachchat erlauben“ aktivieren.
+2. Im selben Netzwerk funktioniert das sofort. Über das Internet (NAT) wird ein STUN/TURN-Server benötigt. Standardmäßig ist
+   **kein** externer STUN-Server eingetragen (keine Daten an Dritte). Mitgeliefert ist ein optionaler **coturn**-Container:
+
+   ```bash
+   # .env
+   WEBRTC_TURN_SECRET=$(openssl rand -hex 32)
+   WEBRTC_STUN_URLS=stun:games.example.com:3478
+   WEBRTC_TURN_URLS=turn:games.example.com:3478?transport=udp,turn:games.example.com:3478?transport=tcp
+   docker compose --profile voice up -d
+   ```
+
+   Ports `3478/udp+tcp` und `49160-49200/udp` freigeben. Die TURN-Zugangsdaten erzeugt der Server zeitlich begrenzt (12 h)
+   per HMAC (`use-auth-secret`).
+3. Browser verlangen für das Mikrofon HTTPS (oder `localhost`). Im Desktop-Client fragt Windows (WebView2) nach der Freigabe;
+   unter Linux gibt der Client nur das **Mikrofon** frei (Kamera bleibt gesperrt).
+
+### GIFs
+
+Mit `TENOR_API_KEY` (kostenlos, Google Cloud Console) und aktivierter Einstellung „GIF-Suche“ erscheint im Chat ein GIF-Knopf.
+Die Suche läuft über den Server; beim **Anzeigen** lädt der Client die GIFs direkt von `media.tenor.com`. Ohne Schlüssel bleibt
+die Funktion aus.
 
 ---
 
@@ -166,8 +235,12 @@ Alle Optionen stehen kommentiert in [`.env.example`](.env.example). Die wichtigs
 | `SMTP_*` | E-Mail-Versand (Passwort-Reset). Leer = deaktiviert |
 | `OIDC_*` | Optionales SSO. Redirect-URI: `${PUBLIC_URL}/api/auth/oidc/callback` |
 | `RAWG_API_KEY`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | Optionaler Metadaten-Import |
+| `APP_SECRET` | Geheimnis für signierte Bild-URLs (leer = automatisch erzeugt und in der DB gespeichert) |
+| `TENOR_API_KEY` | Optionale GIF-Suche im Chat |
+| `WEBRTC_STUN_URLS`, `WEBRTC_TURN_URLS`, `WEBRTC_TURN_SECRET` | STUN/TURN für den Sprachchat (siehe oben) |
 
-Laufzeit-Einstellungen (Registrierungsmodus, Wartungsmodus, Limits, Backup-Zeitplan, öffentlicher Store) werden im
+Laufzeit-Einstellungen (Registrierungsmodus, Wartungsmodus, Limits, Backup-Zeitplan, öffentlicher Store, Sprachchat, GIFs,
+max. Bildgröße im Chat) werden im
 Admin-Panel unter **Verwaltung → Einstellungen** gesetzt und in der Datenbank gespeichert.
 
 ---
@@ -252,6 +325,9 @@ pnpm test
   Pause/Fortsetzen, Offset-Konflikt, Prüfsummen, Archivprüfung, Kontingent**, **Downloads mit Range/HEAD/ETag/Drosselung**,
   Medien, Store-Suche/Filter/Empfehlungen/Entdeckungs-Queue, Bibliothek/Sammlungen/Spielzeit, Admin (Nutzer, Einladungen,
   Einstellungen, Speicher, Backups mit `pg_dump`), OpenAPI, Sicherheitsheader und Rate-Limiting.
+  **Phase 3**: Freunde/Blockieren/Präsenz, Profile mit Privatsphäre und Vitrinen, Abzeichen, Chat (Rechte, Ungelesen,
+  E-Mail nur bei erster ungelesener Nachricht, Bilder per signierter URL, GIF-Sperre), TURN-HMAC, Gruppen (Anfragen, Rollen,
+  versteckte Gruppen, Kanal-Synchronisation, Events, Erinnerungen), Reviews/Bewertungsstufen/Stimmen, Forum, Community-Inhalte.
   Andere Testdatenbank: `DATABASE_URL_TEST=… pnpm test`.
 - `packages/shared`: Upload-Client (Chunks, Wiederholung nach Netzwerkfehler, Pause/Fortsetzen) und Formatierer.
 - `apps/web`: Prüfung, dass alle im Code verwendeten Übersetzungsschlüssel auf Deutsch und Englisch existieren.
@@ -273,7 +349,7 @@ Der Server-Container enthält `pg_dump` (PostgreSQL 17) für Backups und startet
 ## Backups & Wiederherstellung
 
 Backups liegen als `.tar.gz` in `DATA_PATH/backups` und enthalten `database.dump` (pg_dump Custom-Format), `backup.json` und –
-bei vollständigen Backups – die Ordner `builds/`, `media/`, `avatars/`.
+bei vollständigen Backups – die Ordner `builds/`, `media/`, `avatars/`, `social/` (Chat-, Profil-, Gruppen- und Community-Bilder).
 
 Wiederherstellung (Beispiel):
 
@@ -285,7 +361,7 @@ mkdir restore && tar -xzf data/backups/backup-<datum>-full.tar.gz -C restore
 docker compose exec -T postgres pg_restore -U gameserver -d gameserver --clean --if-exists --no-owner < restore/database.dump
 
 # Dateien zurückkopieren (nur bei vollständigen Backups)
-cp -a restore/builds restore/media restore/avatars data/
+cp -a restore/builds restore/media restore/avatars restore/social data/
 
 docker compose start server
 ```
@@ -304,8 +380,10 @@ Für große Spielebibliotheken empfiehlt sich zusätzlich ein dateibasiertes Bac
   Bild-Magic-Bytes (kein SVG), `X-Content-Type-Options: nosniff`, Helmet-Header auf der API
 - **Path-Traversal-Schutz** für Build-Dateipfade und Storage-Keys
 - **Rechte pro Spiel** (Maintainer, Zugriffsliste, Sichtbarkeit) und Audit-Log aller sicherheitsrelevanten Aktionen
-- Keine Telemetrie, keine externen Aufrufe außer optional SMTP, OIDC, IGDB/RAWG (nur auf Admin-Aktion) und eingebettete YouTube-Trailer
-  (über `youtube-nocookie.com`)
+- Nutzer-Uploads (Chat, Profile, Gruppen, Community) nur über **signierte, zeitlich begrenzte URLs** (HMAC, 7 Tage)
+- Chat/Profile/Gruppen respektieren **Blockierungen** und **Privatsphäre**; versteckte Spiele bleiben auch in Community und Feed verborgen
+- Keine Telemetrie, keine externen Aufrufe außer optional SMTP, OIDC, IGDB/RAWG (nur auf Admin-Aktion), Tenor (nur mit Schlüssel)
+  und eingebettete YouTube-Trailer (über `youtube-nocookie.com`)
 
 ---
 
@@ -314,7 +392,11 @@ Für große Spielebibliotheken empfiehlt sich zusätzlich ein dateibasiertes Bac
 - OpenAPI 3: `GET /api/openapi.json`, Swagger-UI: `/api/docs`
 - Authentifizierung: Cookie (`gs_session`) + `X-CSRF-Token` oder `Authorization: Bearer gsd_…`
 - WebSocket `/api/ws` (JSON-Ereignisse: `maintenance`, `upload.completed`, `backup.updated`, `announcement.created`,
-  `library.updated`, `session.revoked`)
+  `library.updated`, `session.revoked`, `notification`, `presence`, `friends.changed`, `chat.message`, `chat.message.updated`,
+  `chat.typing`, `chat.conversation`, `voice.participants`, `voice.signal`). Client → Server: `ping`, `chat.typing`,
+  `voice.join`, `voice.leave`, `voice.signal`
+- Soziales: `/api/friends`, `/api/users/search`, `/api/blocks/:id`, `/api/presence`, `/api/profiles/:username`, `/api/me/profile`,
+  `/api/notifications`, `/api/feed`, `/api/chat/*`, `/api/groups/*`, `/api/community/*`, signierte Dateien `/api/files/social/…`
 - Upload-Protokoll: `POST /api/uploads` → `PATCH /api/uploads/:id` (Header `Upload-Offset`, Body
   `application/offset+octet-stream`) → bei Abbruch `GET /api/uploads/:id` für den aktuellen Offset
 - Downloads: `GET /api/builds/:id/manifest` (Dateien mit Größe und SHA-256), `GET /api/builds/:id/files/:fileId` mit
@@ -355,6 +437,10 @@ Serverseitig dazu:
   Desktop-Client verifiziert.
 - **Metadaten-Import** benötigt eigene API-Schlüssel für IGDB (Twitch) bzw. RAWG.
 - **Vollständige Backups** kopieren alle Spieldateien und benötigen entsprechend Platz und Zeit.
+- **Sprachchat** ist ein WebRTC-Mesh: sinnvoll bis ca. 6 Personen; über das Internet nur mit STUN/TURN (optionaler coturn-Container).
+  Für große Sprachkanäle wäre ein SFU (z. B. LiveKit) nötig – bewusst nicht enthalten.
+- **Abzeichen** werden aus Meilensteinen berechnet; Sammelkarten, Level und eigene Abzeichen folgen in Phase 4.
+- **Bild-Links** aus Chat/Community sind 7 Tage gültig und werden beim Neuladen der Seite automatisch erneuert.
 
 ---
 

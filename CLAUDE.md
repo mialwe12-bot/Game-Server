@@ -22,7 +22,9 @@ Download-Manager sind Pflicht.
 - **Phase 1 fertig** (Server, Web-Store, Admin, Docker, Tests, CI, README).
 - **Phase 2 fertig** (Desktop-Client im Repo `game-client`, siehe dessen CLAUDE.md; Frontend-Desktop-Modus hier in
   `apps/web/src/desktop/`, Client-Releases/Updater in `apps/server/src/routes/client.ts`).
-- Nächster Schritt: **Phase 3 – Soziales** (Freunde, Chat, Gruppen, Community, Benachrichtigungen).
+- **Phase 3 fertig** (Soziales, siehe Abschnitt unten). Version noch 0.2.0 (bei Release auf 0.3.0 heben).
+- Nächster Schritt: **Phase 4 – Steam-Features** – erst auf Anweisung des Nutzers starten; Hinweise zu Einschränkungen stehen in
+  `docs/ROADMAP.md` (Overlay, Remote Play, Hotkey-Screenshots, Cloud-Saves, Achievements, Discord).
 
 ## Architektur & Entscheidungen
 
@@ -82,6 +84,33 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - Server: Modelle `ClientRelease`/`ClientReleaseFile`; Updater bevorzugt NSIS > MSI (Windows), AppImage (Linux).
 - Playtime-Endpunkt akzeptiert `startedAt` mit Offset (`datetime({ offset: true })`).
 - CORS-Standard: `tauri://localhost,http://tauri.localhost,https://tauri.localhost`; CORP global `cross-origin`.
+
+## Phase 3 – Soziales (Architektur)
+- Schema-Migration `social`: Friendship (PENDING/ACCEPTED), Block, Conversation (DIRECT mit `directKey` = sortierte IDs,
+  GROUP, CHANNEL mit `groupId`), ConversationMember (lastReadAt, muted, isAdmin), Message (Soft-Delete), Group/GroupMember
+  (Rolle + Status ACTIVE/PENDING/INVITED), GroupAnnouncement, GroupEvent(+Rsvp, `reminded`), Review(+Vote), ForumTopic/Post,
+  CommunityItem(+Like; SCREENSHOT/ARTWORK/GUIDE), Notification, Activity. User: profile*-Felder, showcases/notificationPrefs (JSON).
+- Typen: `packages/shared/src/social.ts`; `WsEvent` erweitert, neu `WsClientMessage`; ApiClient: `friends`, `profiles`,
+  `notifications`, `chat`, `groups`, `community`, `wsSend()`.
+- Server-Dienste: `services/social.ts` (Relation, Blockieren, PresenceService, Abzeichen), `services/notify.ts`
+  (NotificationService: DB + WS + E-Mail nur wenn offline & Kategorie an; ActivityService), `services/chat.ts` (ChatService,
+  ICE/TURN-HMAC), `services/groups.ts` (Kanal-Sync, Event-Erinnerungen alle 5 min), `services/social-dto.ts`.
+  Hub (`services/hub.ts`) verwaltet Präsenz (onPresence) und Sprachräume (Signal-Relay).
+- Routen: `friends.ts` (/friends, /users/search, /blocks, /presence), `profiles.ts` (/profiles/:username, /me/profile),
+  `notifications.ts` (/notifications, /feed, **/files/*** = signierte Dateien), `chat.ts` (/chat), `groups.ts` (/groups),
+  `community.ts` (/community). Nutzer-Uploads in Storage-Bereich `social/…`, Auslieferung nur per `UrlSigner`
+  (`lib/sign.ts`, HMAC mit APP_SECRET bzw. auto-generiert in Setting `internal.appSecret`, Gültigkeit 7 Tage).
+- Chat-E-Mails nur für die erste ungelesene Nachricht (lastReadAt < vorheriges lastMessageAt); Kanäle nie per Mail.
+- Sprachchat: WebRTC-Mesh (`apps/web/src/pages/chat/voice.ts`), Initiator = kleinere User-ID; Admin-Schalter `voiceEnabled`;
+  ICE aus WEBRTC_STUN_URLS/WEBRTC_TURN_URLS/WEBRTC_TURN_SECRET; coturn per `docker compose --profile voice`.
+  Echt getestet mit zwei Chromium-Kontexten (Fake-Mikrofon) – Audio in beide Richtungen.
+- GIFs: Tenor v2 über Server-Proxy (`TENOR_API_KEY` + Setting `gifsEnabled`), nur URLs von *.tenor.com im Chat erlaubt.
+- Web: Ereignis-Bus `lib/events.ts` (useWsEvent), `lib/social.ts` (Cache-Invalidierung, Toasts, Systembenachrichtigungen),
+  Seiten in `pages/social`, `pages/chat` (lazy), `pages/groups` (lazy), `pages/community` (Tabs auf der Spieleseite:
+  Routen `/game/:slug/:tab` und `/game/:slug/forum/:topicId`), Konto-Einstellungen `pages/account/SocialSettings.tsx`.
+  Desktop: `DesktopProvider` meldet laufendes Spiel als Präsenz (auch nach WS-Reconnect bei `hello`).
+- Benachrichtigungs-`path` muss eine existierende Web-Route sein (z. B. `/groups/<slug>`, `/game/<slug>/reviews`).
+- E2E-Skripte (Playwright) lagen nur im Scratchpad; Testnutzer in der Dev-DB: admin/admin-passwort-123, bob/testpasswort-123.
 
 ## Konventionen
 
