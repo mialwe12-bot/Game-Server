@@ -1,11 +1,13 @@
 import clsx from 'clsx';
-import { Archive, BookOpen, FileText, Gamepad2, HardDrive, LayoutDashboard, Mail, Megaphone, Settings, Users } from 'lucide-react';
+import { Archive, BookOpen, FileText, Gamepad2, HardDrive, LayoutDashboard, Mail, Megaphone, Monitor, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import AnnouncementsPage from './AnnouncementsPage';
 import BackupsPage from './BackupsPage';
+import ClientReleasesPage from './ClientReleasesPage';
 import DashboardPage from './DashboardPage';
 import GameEditPage from './GameEditPage';
 import GamesPage from './GamesPage';
@@ -69,12 +71,15 @@ export default function AdminRoutes() {
               <SideLink to="/admin/logs" icon={<FileText className="size-4" />}>
                 {t('admin.logs')}
               </SideLink>
+              <SideLink to="/admin/client" icon={<Monitor className="size-4" />}>
+                {t('admin.clientReleases')}
+              </SideLink>
               <SideLink to="/admin/settings" icon={<Settings className="size-4" />}>
                 {t('admin.settings')}
               </SideLink>
             </>
           )}
-          <a href="/api/docs" target="_blank" rel="noopener noreferrer" className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-fg">
+          <a href={`${api.baseUrl}/api/docs`} target="_blank" rel="noopener noreferrer" className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-fg">
             <BookOpen className="size-4" />
             {t('admin.apiDocs')}
           </a>
@@ -95,6 +100,7 @@ export default function AdminRoutes() {
               <Route path="backups" element={<BackupsPage />} />
               <Route path="logs" element={<LogsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="client" element={<ClientReleasesPage />} />
             </>
           )}
           <Route path="*" element={<Navigate to="/admin" replace />} />

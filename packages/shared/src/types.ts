@@ -415,3 +415,29 @@ export type WsEvent =
   | { type: 'library.updated'; data: { gameId: string } }
   | { type: 'session.revoked'; data: { sessionId: string } }
   | { type: 'pong'; data: { time: string } };
+
+// ---- Phase 2: Desktop-Client ----
+
+export type ClientFileFormat = 'MSI' | 'NSIS' | 'APPIMAGE' | 'DEB' | 'RPM' | 'DMG' | 'APP_TARBALL';
+
+export interface ClientReleaseFileDto {
+  id: string;
+  platform: Platform;
+  arch: string;
+  format: ClientFileFormat;
+  filename: string;
+  size: number;
+  sha256: string;
+  hasSignature: boolean;
+  downloadUrl: string;
+}
+
+export interface ClientReleaseDto {
+  id: string;
+  version: string;
+  notes: string;
+  published: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  files: ClientReleaseFileDto[];
+}

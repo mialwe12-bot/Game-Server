@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { adminRoutes } from './admin.js';
 import { authRoutes } from './auth.js';
+import { clientRoutes } from './client.js';
 import { downloadRoutes } from './downloads.js';
 import { libraryRoutes } from './library.js';
 import { manageRoutes } from './manage.js';
@@ -21,5 +22,6 @@ export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(downloadRoutes, { prefix: '/builds' });
   await app.register(manageRoutes, { prefix: '/manage' });
   await app.register(adminRoutes, { prefix: '/admin' });
+  await app.register(clientRoutes);
   app.get('/openapi.json', { schema: { hide: true }, config: { allowInMaintenance: true } }, async () => app.swagger());
 };

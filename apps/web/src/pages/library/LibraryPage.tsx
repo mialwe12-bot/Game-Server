@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { EyeOff, Folder, FolderPlus, Gamepad2, LayoutGrid, List, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react';
+import { EyeOff, Folder, FolderPlus, Gamepad2, HardDrive, LayoutGrid, List, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -11,6 +11,8 @@ import { Button, ConfirmButton, EmptyState, ErrorState, Input, Modal, PageLoader
 import { api, errorMessage } from '../../lib/api';
 import { formatDate, formatPlaytime } from '../../lib/format';
 import { toast } from '../../lib/toast';
+import { useDesktop } from '../../desktop/DesktopProvider';
+import { InstalledList, LibraryPlayButton } from '../../desktop/LibraryActions';
 
 type Sort = 'title' | 'lastPlayed' | 'playtime' | 'added';
 
@@ -87,6 +89,7 @@ export default function LibraryPage() {
   const [layout, setLayout] = useState<'grid' | 'list'>(() => (localStorage.getItem('gs-lib-layout') as 'grid' | 'list') || 'grid');
   const [q, setQ] = useState('');
   const [collectionModal, setCollectionModal] = useState<{ id?: string; name: string } | null>(null);
+  const desk = useDesktop();
 
   useEffect(() => localStorage.setItem('gs-lib-sort', sort), [sort]);
   useEffect(() => localStorage.setItem('gs-lib-layout', layout), [layout]);
@@ -96,7 +99,7 @@ export default function LibraryPage() {
     q: q || undefined,
     favorites: view === 'favorites' || undefined,
     hidden: view === 'hidden' || undefined,
-    collection: !['all', 'favorites', 'hidden'].includes(view) ? view : undefined,
+    collection: !['all', 'favorites', 'hidden', 'installed'].includes(view) ? view : undefined,
   };
   const entries = useQuery({ queryKey: ['library', query], queryFn: () => api.library.list(query) });
   const collections = useQuery({ queryKey: ['library', 'collections'], queryFn: () => api.library.collections() });
@@ -134,6 +137,7 @@ export default function LibraryPage() {
         {sideItem('all', t('library.all'), <Gamepad2 className="size-4" />)}
         {sideItem('favorites', t('library.favorites'), <Star className="size-4" />)}
         {sideItem('hidden', t('library.hidden'), <EyeOff className="size-4" />)}
+        {desk && sideItem('installed', t('desktop.installedTab'), <HardDrive className="size-4" />, desk.installed.length)}
         <div className="flex items-center justify-between pt-4 pb-1">
           <span className="px-3 text-xs font-semibold uppercase text-muted">{t('library.collections')}</span>
           <button type="button" className="rounded p-1 text-muted hover:text-fg" onClick={() => setCollectionModal({ name: '' })} aria-label={t('library.newCollection')}>
@@ -180,7 +184,9 @@ export default function LibraryPage() {
         </div>
         {!!entries.data?.length && <p className="text-sm text-muted">{t('library.totalPlaytime', { time: formatPlaytime(totalPlaytime) })}</p>}
 
-        {entries.isLoading ? (
+        {desk && view === 'installed' ? (
+          <InstalledList />
+        ) : entries.isLoading ? (
           <PageLoader />
         ) : entries.error ? (
           <ErrorState error={entries.error} onRetry={() => entries.refetch()} />
@@ -204,6 +210,7 @@ export default function LibraryPage() {
                       {e.game.title}
                     </Link>
                     <p className="text-xs text-muted">{e.playtimeSeconds > 0 ? formatPlaytime(e.playtimeSeconds) : t('library.neverPlayed')}</p>
+                    {desk && <LibraryPlayButton gameId={e.game.id} slug={e.game.slug} />}
                   </div>
                   <EntryMenu entry={e} collections={collections.data ?? []} onChange={refresh} />
                 </div>
@@ -226,6 +233,7 @@ export default function LibraryPage() {
                     {e.lastPlayedAt ? t('library.lastPlayed', { date: formatDate(e.lastPlayedAt) }) : t('library.neverPlayed')}
                   </p>
                 </div>
+                {desk && <LibraryPlayButton gameId={e.game.id} slug={e.game.slug} />}
                 <PlatformIcons platforms={e.game.platforms} className="hidden sm:inline-flex" />
                 <span className="w-20 text-right text-sm text-muted">{formatPlaytime(e.playtimeSeconds)}</span>
                 <EntryMenu entry={e} collections={collections.data ?? []} onChange={refresh} />
@@ -233,7 +241,7 @@ export default function LibraryPage() {
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted">{t('library.clientHint')}</p>
+        {!desk && <p className="text-xs text-muted">{t('library.clientHint')}</p>}
       </section>
 
       <Modal open={!!collectionModal} onClose={() => setCollectionModal(null)} title={collectionModal?.id ? t('library.renameCollection') : t('library.newCollection')}>

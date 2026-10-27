@@ -1,8 +1,10 @@
 import clsx from 'clsx';
-import { CheckCircle2, ChevronDown, Info, Library, LogOut, Menu, Monitor, Moon, Search, Settings, Shield, Store, Sun, User, X, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { isDesktop } from '../desktop/bridge';
+import { activeDownloads, useDesktop } from '../desktop/DesktopProvider';
 import { LANGUAGES } from '../i18n';
 import { useAuth } from '../lib/auth';
 import { useTheme, type ThemeMode } from '../lib/theme';
@@ -81,11 +83,26 @@ function UserMenu() {
                   {t('nav.admin')}
                 </MenuLink>
               )}
+              {!isDesktop && (
+                <MenuLink to="/client" icon={<Monitor className="size-4" />} onClick={() => setOpen(false)}>
+                  {t('nav.getClient')}
+                </MenuLink>
+              )}
             </div>
           ) : (
             <div className="border-b border-border p-1">
               <MenuLink to="/login" icon={<User className="size-4" />} onClick={() => setOpen(false)}>
                 {t('nav.login')}
+              </MenuLink>
+            </div>
+          )}
+          {isDesktop && (
+            <div className="border-b border-border p-1">
+              <MenuLink to="/client-settings" icon={<SlidersHorizontal className="size-4" />} onClick={() => setOpen(false)}>
+                {t('desktop.clientSettings')}
+              </MenuLink>
+              <MenuLink to="/server-setup" icon={<Server className="size-4" />} onClick={() => setOpen(false)}>
+                {t('desktop.changeServer')}
               </MenuLink>
             </div>
           )}
@@ -208,6 +225,8 @@ export function Toaster() {
 export function Layout() {
   const { t } = useTranslation();
   const { user, settings } = useAuth();
+  const desk = useDesktop();
+  const openDownloads = desk ? activeDownloads(desk.downloads).length : 0;
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setMobileOpen(false), [location.pathname]);
@@ -232,6 +251,12 @@ export function Layout() {
           <NavItem to="/wishlist" icon={<Star className="size-4" />}>
             {t('nav.wishlist')}
           </NavItem>
+          {desk && (
+            <NavItem to="/downloads" icon={<Download className="size-4" />}>
+              {t('nav.downloads')}
+              {openDownloads > 0 && <span className="rounded-full bg-accent px-1.5 text-xs text-accent-fg">{openDownloads}</span>}
+            </NavItem>
+          )}
         </>
       )}
     </>
@@ -271,6 +296,14 @@ export function Layout() {
       </main>
       <footer className="border-t border-border py-6 text-center text-xs text-muted">
         {settings?.siteName} · v{settings?.version} · Open Source · DRM-frei
+        {!isDesktop && (
+          <>
+            {' · '}
+            <Link to="/client" className="text-accent hover:underline">
+              {t('nav.getClient')}
+            </Link>
+          </>
+        )}
       </footer>
       <Toaster />
     </div>

@@ -83,7 +83,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await app.register(helmet, {
     // Die API liefert JSON/Dateien; die CSP für die Weboberfläche setzt der Web-Container.
     contentSecurityPolicy: false,
-    crossOriginResourcePolicy: { policy: 'same-site' },
+    // Bilder/Dateien müssen auch in der WebView des Desktop-Clients (andere Origin) ladbar sein.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   });
   if (config.corsOrigins.length) {
     // Für den Desktop-Client (Tauri-WebView) – Authentifizierung dort ausschließlich per Bearer-Token.
@@ -106,7 +107,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     }),
   });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1, fields: 10 } });
-  await app.register(websocket, { options: { maxPayload: 64 * 1024 } });
+  await app.register(websocket, {
+    options: {
+      maxPayload: 64 * 1024,
+      // Desktop-Client authentifiziert sich per Subprotokoll "bearer.<token>" und erhält "gs.v1" zurück.
+      handleProtocols: (protocols: Set<string>) => (protocols.has('gs.v1') ? 'gs.v1' : false),
+    },
+  });
 
   // Rohdaten-Chunks für fortsetzbare Uploads werden als Stream durchgereicht.
   app.addContentTypeParser('application/offset+octet-stream', (_req, payload, done) => done(null, payload));

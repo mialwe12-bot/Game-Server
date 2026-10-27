@@ -15,7 +15,8 @@ const schema = z.object({
   DATA_DIR: z.string().default('./data'),
   COOKIE_SECURE: bool.default(false),
   TRUST_PROXY: bool.default(false),
-  CORS_ORIGINS: z.string().default(''),
+  // Origins der Tauri-WebView (Linux: tauri://localhost, Windows: http(s)://tauri.localhost)
+  CORS_ORIGINS: z.string().default('tauri://localhost,http://tauri.localhost,https://tauri.localhost'),
   LOG_LEVEL: z.string().default('info'),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
   DEVICE_TTL_DAYS: z.coerce.number().int().positive().default(365),

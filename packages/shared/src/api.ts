@@ -8,6 +8,7 @@ import type {
   BuildDto,
   BuildFileDto,
   BuildManifest,
+  ClientReleaseDto,
   CollectionDto,
   CurrentUser,
   DiscoveryAction,
@@ -419,7 +420,26 @@ export class ApiClient {
     backupDownloadUrl: (id: string) => `${this.baseUrl}/api/admin/backups/${id}/download`,
   };
 
-  /** WebSocket-Verbindung (Browser: Cookie-Auth). Verbindet bei Abbruch automatisch neu. */
+  // ---- Desktop-Client-Releases ----
+  client = {
+    latest: () => this.get<ClientReleaseDto | null>('/client/releases/latest'),
+    releases: () => this.get<ClientReleaseDto[]>('/admin/client-releases'),
+    createRelease: (version: string, notes: string) => this.post<ClientReleaseDto>('/admin/client-releases', { version, notes }),
+    updateRelease: (id: string, data: { notes?: string; published?: boolean }) => this.patch<ClientReleaseDto>(`/admin/client-releases/${id}`, data),
+    deleteRelease: (id: string) => this.del<{ ok: true }>(`/admin/client-releases/${id}`),
+    uploadFile: (id: string, file: Blob, filename: string) => {
+      const fd = new FormData();
+      fd.append('file', file, filename);
+      return this.request<ClientReleaseDto>('POST', `/admin/client-releases/${id}/files`, { body: fd });
+    },
+    setSignature: (fileId: string, signature: string | null) => this.patch<ClientReleaseDto>(`/admin/client-files/${fileId}`, { signature }),
+    deleteFile: (fileId: string) => this.del<{ ok: true }>(`/admin/client-files/${fileId}`),
+  };
+
+  /**
+   * WebSocket-Verbindung. Browser: Cookie-Auth; Desktop-Client: Device-Token als Subprotokoll "bearer.<token>".
+   * Verbindet bei Abbruch automatisch neu.
+   */
   connectEvents(onEvent: (e: WsEvent) => void): () => void {
     let ws: WebSocket | null = null;
     let closed = false;
@@ -429,7 +449,7 @@ export class ApiClient {
     const wsUrl = `${base.replace(/^http/, 'ws')}/api/ws`;
     const connect = () => {
       if (closed) return;
-      ws = new WebSocket(wsUrl);
+      ws = this.token ? new WebSocket(wsUrl, ['gs.v1', `bearer.${this.token}`]) : new WebSocket(wsUrl);
       ws.onopen = () => {
         retry = 1000;
         ping = setInterval(() => ws?.readyState === 1 && ws.send(JSON.stringify({ type: 'ping' })), 30_000);

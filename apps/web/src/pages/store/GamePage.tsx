@@ -14,6 +14,8 @@ import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDate, formatPlaytime } from '../../lib/format';
 import { toast } from '../../lib/toast';
 import NotFoundPage from '../NotFoundPage';
+import { useDesktop } from '../../desktop/DesktopProvider';
+import { GameInstallPanel } from '../../desktop/GameInstallPanel';
 
 type Slide = { type: 'image'; media: MediaDto } | { type: 'youtube' | 'video'; src: string };
 
@@ -205,6 +207,7 @@ export default function GamePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const desk = useDesktop();
   const game = useQuery({ queryKey: ['game', slug, user?.id], queryFn: () => api.store.game(slug) });
   const similar = useQuery({ queryKey: ['similar', slug], queryFn: () => api.store.similar(slug), enabled: game.isSuccess });
 
@@ -359,23 +362,27 @@ export default function GamePage() {
             )}
           </Card>
 
+          {desk ? (
+            <GameInstallPanel game={g} />
+          ) : (
           <Card title={t('store.downloads')}>
-            {latest ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted">
-                  {t('store.version')} {latest.version} · {formatDate(latest.publishedAt ?? latest.createdAt)}
-                </p>
-                {latest.builds
-                  .filter((b) => b.status === 'READY')
-                  .map((b) => (
-                    <BuildDownload key={b.id} build={b} />
-                  ))}
-                <p className="text-xs text-muted">{t('library.clientHint')}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-muted">{t('store.noBuilds')}</p>
-            )}
-          </Card>
+              {latest ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted">
+                    {t('store.version')} {latest.version} · {formatDate(latest.publishedAt ?? latest.createdAt)}
+                  </p>
+                  {latest.builds
+                    .filter((b) => b.status === 'READY')
+                    .map((b) => (
+                      <BuildDownload key={b.id} build={b} />
+                    ))}
+                  <p className="text-xs text-muted">{t('library.clientHint')}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted">{t('store.noBuilds')}</p>
+              )}
+            </Card>
+          )}
 
           {g.description && (
             <Card title={t('store.about')}>

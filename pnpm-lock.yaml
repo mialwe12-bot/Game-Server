@@ -101,6 +101,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.105.0
         version: 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@tauri-apps/api':
+        specifier: ^2.12.4
+        version: 2.12.4
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -1005,6 +1008,9 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  '@tauri-apps/api@2.12.4':
+    resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -3088,6 +3094,8 @@ snapshots:
       react: 19.3.1
     optionalDependencies:
       '@types/react': 19.3.0
+
+  '@tauri-apps/api@2.12.4': {}
 
   '@types/babel__core@7.20.5':
     dependencies:

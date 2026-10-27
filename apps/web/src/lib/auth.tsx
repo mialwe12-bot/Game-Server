@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, type ReactNode } from 'react';
-import type { CurrentUser, PublicSettings, WsEvent } from '@gameserver/shared';
+import { ApiError, type CurrentUser, type MeResponse, type PublicSettings, type WsEvent } from '@gameserver/shared';
+import { desktop, isDesktop } from '../desktop/bridge';
 import i18n from '../i18n';
 import { api } from './api';
 import { toast } from './toast';
@@ -9,6 +10,8 @@ interface AuthState {
   user: CurrentUser | null;
   settings: PublicSettings | null;
   loading: boolean;
+  /** Desktop-Client ohne Verbindung zum Server */
+  offline: boolean;
   refresh: () => Promise<void>;
   setUser: (u: CurrentUser | null) => void;
   logout: () => Promise<void>;
@@ -18,8 +21,32 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api.auth.me(), staleTime: 60_000 });
-  const settings = useQuery({ queryKey: ['public-settings'], queryFn: () => api.publicSettings(), staleTime: 60_000 });
+  const me = useQuery({
+    queryKey: ['me'],
+    queryFn: async (): Promise<MeResponse> => {
+      if (isDesktop && !api.baseUrl) return { user: null, csrfToken: null };
+      try {
+        return await api.auth.me();
+      } catch (err) {
+        // Widerrufenes/abgelaufenes Device-Token → abmelden
+        if (isDesktop && err instanceof ApiError && err.status === 401) {
+          api.token = null;
+          await desktop.clearSession();
+          return { user: null, csrfToken: null };
+        }
+        throw err;
+      }
+    },
+    staleTime: 60_000,
+  });
+  const settings = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: () => api.publicSettings(),
+    staleTime: 60_000,
+    enabled: !isDesktop || !!api.baseUrl,
+  });
+  const isNetworkError = (e: unknown) => !!e && !(e instanceof ApiError);
+  const offline = isDesktop && !!api.baseUrl && (isNetworkError(me.error) || isNetworkError(settings.error));
   const user = me.data?.user ?? null;
 
   const refresh = useCallback(async () => {
@@ -36,6 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.auth.logout().catch(() => undefined);
+    if (isDesktop) {
+      api.token = null;
+      await desktop.clearSession();
+    }
     qc.clear();
     qc.setQueryData(['me'], { user: null, csrfToken: null });
     await qc.invalidateQueries({ queryKey: ['public-settings'] });
@@ -48,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Echtzeit-Ereignisse
   useEffect(() => {
-    if (me.isLoading) return;
+    if (me.isLoading || offline || (isDesktop && !api.baseUrl)) return;
     return api.connectEvents((e: WsEvent) => {
       switch (e.type) {
         case 'maintenance':
@@ -71,11 +102,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           break;
       }
     });
-  }, [me.isLoading, user?.id, qc]);
+  }, [me.isLoading, user?.id, qc, offline]);
 
   return (
     <AuthContext.Provider
-      value={{ user, settings: settings.data ?? null, loading: me.isLoading || settings.isLoading, refresh, setUser, logout }}
+      value={{
+        user,
+        settings: settings.data ?? null,
+        loading: me.isLoading || (settings.isLoading && settings.fetchStatus !== 'idle'),
+        offline,
+        refresh,
+        setUser,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

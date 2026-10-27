@@ -49,7 +49,18 @@ export function clearSessionCookies(ctx: AppContext, reply: FastifyReply) {
 
 export function extractBearer(req: FastifyRequest): string | null {
   const h = req.headers.authorization;
-  if (!h) return null;
-  const m = /^Bearer\s+(\S+)$/i.exec(h);
-  return m ? m[1] : null;
+  if (h) {
+    const m = /^Bearer\s+(\S+)$/i.exec(h);
+    return m ? m[1] : null;
+  }
+  // Browser-WebSockets können keine Header setzen → Token als Subprotokoll "bearer.<token>"
+  const proto = req.headers['sec-websocket-protocol'];
+  if (typeof proto === 'string' && req.headers.upgrade?.toLowerCase() === 'websocket') {
+    const entry = proto
+      .split(',')
+      .map((p) => p.trim())
+      .find((p) => p.startsWith('bearer.'));
+    if (entry) return entry.slice('bearer.'.length);
+  }
+  return null;
 }
