@@ -37,8 +37,31 @@ export interface UserSearchResult {
   relation: RelationState;
 }
 
-export type ShowcaseKind = 'favoriteGame' | 'stats' | 'recentGames' | 'screenshots' | 'reviews' | 'groups' | 'badges' | 'text';
-export const SHOWCASE_KINDS: ShowcaseKind[] = ['favoriteGame', 'stats', 'recentGames', 'screenshots', 'reviews', 'groups', 'badges', 'text'];
+export type ShowcaseKind =
+  | 'favoriteGame'
+  | 'stats'
+  | 'recentGames'
+  | 'screenshots'
+  | 'reviews'
+  | 'groups'
+  | 'badges'
+  | 'text'
+  | 'achievements'
+  | 'gameBadges'
+  | 'workshop';
+export const SHOWCASE_KINDS: ShowcaseKind[] = [
+  'favoriteGame',
+  'stats',
+  'recentGames',
+  'screenshots',
+  'reviews',
+  'groups',
+  'badges',
+  'text',
+  'achievements',
+  'gameBadges',
+  'workshop',
+];
 
 export interface ShowcaseConfig {
   kind: ShowcaseKind;
@@ -55,6 +78,7 @@ export interface BadgeDto {
 }
 
 export interface ProfileStats {
+  achievements: number;
   games: number;
   playtimeSeconds: number;
   reviews: number;
@@ -72,6 +96,10 @@ export interface ResolvedShowcase {
   items: CommunityItemDto[];
   reviews: ReviewDto[];
   groups: GroupSummary[];
+  /** Phase 4 */
+  achievements: (import('./steam.js').AchievementDto & { game: import('./steam.js').GameRef })[];
+  gameBadges: import('./steam.js').GameBadgeDto[];
+  workshopItems: import('./steam.js').WorkshopItemDto[];
 }
 
 export interface ProfileDto {
@@ -87,6 +115,9 @@ export interface ProfileDto {
   badges: BadgeDto[];
   showcases: ResolvedShowcase[];
   activity: ActivityDto[];
+  /** Phase 4 */
+  level: import('./steam.js').ProfileLevel | null;
+  achievementCount: number;
 }
 
 export interface ProfileSettings {
@@ -296,7 +327,15 @@ export type NotificationType =
   | 'event.created'
   | 'event.reminder'
   | 'review.helpful'
-  | 'forum.reply';
+  | 'forum.reply'
+  // Phase 4
+  | 'card.drop'
+  | 'trade.offer'
+  | 'trade.accepted'
+  | 'market.completed'
+  | 'gift.received'
+  | 'family.invite'
+  | 'workshop.comment';
 
 export interface NotificationDto {
   id: string;
@@ -308,10 +347,13 @@ export interface NotificationDto {
 }
 
 export interface NotificationPrefs {
-  email: { friends: boolean; messages: boolean; groups: boolean; events: boolean; community: boolean };
+  email: { friends: boolean; messages: boolean; groups: boolean; events: boolean; community: boolean; trading: boolean };
 }
 
 export type ActivityType =
+  | 'achievement.unlocked'
+  | 'badge.crafted'
+  | 'workshop.published'
   | 'library.added'
   | 'game.played'
   | 'review.created'

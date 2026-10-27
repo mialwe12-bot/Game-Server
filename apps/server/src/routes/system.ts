@@ -35,6 +35,14 @@ export const systemRoutes: FastifyPluginAsyncZod = async (app) => {
         smtpEnabled: ctx.mailer.enabled,
         metadataProviders: ctx.metadata.available(),
         version: ctx.config.version,
+        features: {
+          cloudSaves: s.cloudSavesEnabled,
+          workshop: s.workshopEnabled,
+          cards: s.cardsEnabled,
+          market: s.cardsEnabled && s.marketEnabled,
+          gifts: s.giftsEnabled,
+        },
+        discordAppId: s.discordAppId,
       };
     },
   );

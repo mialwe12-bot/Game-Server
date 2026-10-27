@@ -15,6 +15,8 @@ import type { UrlSigner } from './lib/sign.js';
 import type { ActivityService, NotificationService } from './services/notify.js';
 import type { PresenceService } from './services/social.js';
 import type { ChatService } from './services/chat.js';
+import type { AchievementService } from './services/achievements.js';
+import type { CardService } from './services/cards.js';
 
 export interface AppContext {
   config: Config;
@@ -34,6 +36,8 @@ export interface AppContext {
   activity: ActivityService;
   presence: PresenceService;
   chat: ChatService;
+  achievements: AchievementService;
+  cards: CardService;
 }
 
 export interface AuthInfo {

@@ -34,6 +34,26 @@ const gameBody = z.object({
   featured: z.boolean().optional(),
   genres: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
   tags: z.array(z.string().trim().min(1).max(60)).max(40).optional(),
+  // Phase 4
+  ageRating: z.union([z.literal(0), z.literal(6), z.literal(12), z.literal(16), z.literal(18)]).optional(),
+  savePaths: z
+    .array(
+      z.object({
+        platform: z.enum(['WINDOWS', 'LINUX', 'ANY']),
+        path: z.string().trim().min(1).max(500),
+        include: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
+        exclude: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
+      }),
+    )
+    .max(16)
+    .optional(),
+  workshopPath: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((p) => !p.split(/[\\/]/).includes('..') && !p.startsWith('/') && !/^[a-zA-Z]:/.test(p), 'Relativer Pfad erwartet')
+    .nullable()
+    .optional(),
 });
 
 const buildBody = z.object({
@@ -115,7 +135,7 @@ export const manageRoutes: FastifyPluginAsyncZod = async (app) => {
 
   app.post('/games', { schema: { tags: ['manage'], summary: 'Spiel anlegen', body: gameBody } }, async (req) => {
     const user = editor(req);
-    const { genres, tags, releaseDate, slug, systemRequirements, ...rest } = req.body;
+    const { genres, tags, releaseDate, slug, systemRequirements, savePaths, ...rest } = req.body;
     let finalSlug = slug ?? slugify(rest.title);
     for (let i = 2; await ctx.db.game.findUnique({ where: { slug: finalSlug } }); i++) finalSlug = `${slug ?? slugify(rest.title)}-${i}`;
     const visibility = rest.visibility ?? 'HIDDEN';
@@ -128,6 +148,7 @@ export const manageRoutes: FastifyPluginAsyncZod = async (app) => {
         publishedAt: visibility !== 'HIDDEN' ? new Date() : null,
         releaseDate: releaseDate ? new Date(releaseDate) : null,
         systemRequirements: (systemRequirements ?? {}) as Prisma.InputJsonValue,
+        savePaths: (savePaths ?? []) as Prisma.InputJsonValue,
         createdById: user.id,
         genres: genres ? { connectOrCreate: connectNames(genres) } : undefined,
         tags: tags ? { connectOrCreate: connectNames(tags) } : undefined,
@@ -150,8 +171,9 @@ export const manageRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req) => {
       const user = editor(req);
       const game = await assertCanEditGame(ctx.db, user, req.params.id);
-      const { genres, tags, releaseDate, systemRequirements, featured, ...rest } = req.body;
+      const { genres, tags, releaseDate, systemRequirements, featured, savePaths, ...rest } = req.body;
       const data: Prisma.GameUpdateInput = { ...rest };
+      if (savePaths !== undefined) data.savePaths = savePaths as Prisma.InputJsonValue;
       if (featured !== undefined && isAdmin(user)) data.featured = featured;
       if (releaseDate !== undefined) data.releaseDate = releaseDate ? new Date(releaseDate) : null;
       if (systemRequirements !== undefined) data.systemRequirements = systemRequirements as Prisma.InputJsonValue;

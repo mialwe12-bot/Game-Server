@@ -4,3 +4,4 @@ export * from './upload.js';
 export * from './format.js';
 export * from './desktop.js';
 export * from './social.js';
+export * from './steam.js';

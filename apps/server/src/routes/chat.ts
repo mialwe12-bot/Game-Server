@@ -7,6 +7,7 @@ import { requireAuth } from '../plugins/auth.js';
 import { conversationInclude, directKey } from '../services/chat.js';
 import { messageDto } from '../services/social-dto.js';
 import { areFriends, assertNotBlocked } from '../services/social.js';
+import { assertChatAllowed } from '../services/family.js';
 
 const convParams = z.object({ id: z.string() });
 const MAX_BODY = 4000;
@@ -66,6 +67,7 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     { schema: { tags: ['chat'], summary: 'Direktnachricht öffnen (nur mit Freunden)', body: z.object({ userId: z.string() }) } },
     async (req): Promise<ConversationDto> => {
       const { user } = requireAuth(req);
+      await assertChatAllowed(ctx.db, user);
       const other = req.body.userId;
       if (other === user.id) throw badRequest('Keine Unterhaltung mit dir selbst', 'self');
       await assertNotBlocked(ctx.db, user.id, other);
@@ -92,6 +94,7 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req): Promise<ConversationDto> => {
       const { user } = requireAuth(req);
+      await assertChatAllowed(ctx.db, user);
       const ids = [...new Set(req.body.userIds.filter((id) => id !== user.id))];
       for (const id of ids) {
         if (!(await areFriends(ctx.db, user.id, id))) throw forbidden('Nur Freunde können hinzugefügt werden', 'not_friends');
@@ -215,6 +218,7 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req): Promise<MessageDto> => {
       const { user } = requireAuth(req);
+      await assertChatAllowed(ctx.db, user);
       const body = req.body.body.trim();
       const gifUrl = req.body.gifUrl;
       if (!body && !gifUrl) throw badRequest('Nachricht ist leer', 'empty');
@@ -240,6 +244,7 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req): Promise<MessageDto> => {
       const { user } = requireAuth(req);
+      await assertChatAllowed(ctx.db, user);
       await chat.membership(req.params.id, user.id);
       const { maxChatImageBytes } = await ctx.settings.get();
       const saved = await saveImageUpload(req, ctx.storage, `social/chat/${req.params.id}`, maxChatImageBytes);

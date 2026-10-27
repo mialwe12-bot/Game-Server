@@ -16,6 +16,7 @@ import {
   reviewSummary,
   topicDto,
 } from '../services/social-dto.js';
+import { assertCommunityAllowed } from '../services/family.js';
 
 const gameParams = z.object({ gameId: z.string().max(100) });
 const idParams = z.object({ id: z.string() });
@@ -94,6 +95,7 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req): Promise<ReviewDto> => {
       const { user } = requireAuth(req);
       const game = await viewableGame(req.params.gameId, user);
+      await assertCommunityAllowed(db, user);
       const entry = await db.libraryEntry.findUnique({ where: { userId_gameId: { userId: user.id, gameId: game.id } } });
       if (!entry) throw forbidden('Nur Spiele aus deiner Bibliothek können bewertet werden', 'not_in_library');
       const existing = await db.review.findUnique({ where: { gameId_userId: { gameId: game.id, userId: user.id } } });
@@ -193,6 +195,7 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req): Promise<ForumTopicDto> => {
       const { user } = requireAuth(req);
       const game = await viewableGame(req.params.gameId, user);
+      await assertCommunityAllowed(db, user);
       const topic = await db.forumTopic.create({
         data: { gameId: game.id, authorId: user.id, title: req.body.title, posts: { create: { authorId: user.id, body: req.body.body } } },
         include: topicInclude,
@@ -241,6 +244,7 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req): Promise<ForumPostDto> => {
       const { user } = requireAuth(req);
       const topic = await loadTopic(req.params.id, user);
+      await assertCommunityAllowed(db, user);
       if (topic.locked && !(await isModerator(user, topic.gameId))) throw forbidden('Thema ist geschlossen', 'locked');
       const post = await db.forumPost.create({ data: { topicId: topic.id, authorId: user.id, body: req.body.body }, include: { author: true } });
       await db.forumTopic.update({ where: { id: topic.id }, data: { lastPostAt: post.createdAt } });
@@ -372,6 +376,7 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req): Promise<CommunityItemDto> => {
       const { user } = requireAuth(req);
       const game = await viewableGame(req.params.gameId, user);
+      await assertCommunityAllowed(db, user);
       const saved = await saveImageUpload(req, ctx.storage, `social/community/${game.id}`, IMAGE_LIMIT);
       const item = await db.communityItem.create({
         data: { gameId: game.id, authorId: user.id, type: req.query.type, title: req.query.title, body: req.query.body, imageKey: saved.key, imageMime: saved.mime },
@@ -395,6 +400,7 @@ export const communityRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req): Promise<CommunityItemDto> => {
       const { user } = requireAuth(req);
       const game = await viewableGame(req.params.gameId, user);
+      await assertCommunityAllowed(db, user);
       const item = await db.communityItem.create({ data: { gameId: game.id, authorId: user.id, type: 'GUIDE', ...req.body }, include: communityItemInclude });
       await ctx.activity.record(user.id, 'community.posted', { itemType: 'GUIDE', itemId: item.id, title: item.title }, game.id);
       return communityItemDto(ctx.signer, item, user.id);

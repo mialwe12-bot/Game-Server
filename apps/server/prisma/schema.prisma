@@ -23,10 +23,10 @@ enum SessionKind {
 }
 
 enum GameVisibility {
-  PUBLIC      // im Store sichtbar
-  UNLISTED    // nur per Direktlink
-  RESTRICTED  // nur für freigegebene Nutzer
-  HIDDEN      // nur Admins/Maintainer (Entwurf)
+  PUBLIC // im Store sichtbar
+  UNLISTED // nur per Direktlink
+  RESTRICTED // nur für freigegebene Nutzer
+  HIDDEN // nur Admins/Maintainer (Entwurf)
 }
 
 enum Platform {
@@ -81,105 +81,129 @@ enum BackupStatus {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  username          String    @unique
-  email             String    @unique
-  passwordHash      String?
-  role              Role      @default(USER)
-  displayName       String?
-  bio               String?
-  avatarKey         String?
-  locale            String    @default("de")
-  disabled          Boolean   @default(false)
-  totpSecret        String?
-  totpEnabled       Boolean   @default(false)
-  totpLastCounter   Int?
-  recoveryCodes     String[]  @default([])
-  oidcSubject       String?   @unique
-  uploadQuotaBytes  BigInt?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  lastLoginAt       DateTime?
+  id               String    @id @default(cuid())
+  username         String    @unique
+  email            String    @unique
+  passwordHash     String?
+  role             Role      @default(USER)
+  displayName      String?
+  bio              String?
+  avatarKey        String?
+  locale           String    @default("de")
+  disabled         Boolean   @default(false)
+  totpSecret       String?
+  totpEnabled      Boolean   @default(false)
+  totpLastCounter  Int?
+  recoveryCodes    String[]  @default([])
+  oidcSubject      String?   @unique
+  uploadQuotaBytes BigInt?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastLoginAt      DateTime?
 
-  sessions          Session[]
-  loginChallenges   LoginChallenge[]
-  resetTokens       PasswordResetToken[]
-  invitesCreated    Invite[]           @relation("InviteCreator")
-  invitedBy         Invite?            @relation("InviteUsedBy", fields: [invitedById], references: [id], onDelete: SetNull)
-  invitedById       String?
-  gamesCreated      Game[]             @relation("GameCreator")
-  maintainerOf      GameMaintainer[]
-  accessTo          GameAccess[]
-  uploads           Upload[]
-  library           LibraryEntry[]
-  collections       Collection[]
-  wishlist          WishlistEntry[]
-  discoveryViews    DiscoveryView[]
-  playSessions      PlaySession[]
-  announcements     Announcement[]
-  auditLogs         AuditLog[]
-  downloads         DownloadEvent[]
-  buildFiles        BuildFile[]
+  sessions        Session[]
+  loginChallenges LoginChallenge[]
+  resetTokens     PasswordResetToken[]
+  invitesCreated  Invite[]             @relation("InviteCreator")
+  invitedBy       Invite?              @relation("InviteUsedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedById     String?
+  gamesCreated    Game[]               @relation("GameCreator")
+  maintainerOf    GameMaintainer[]
+  accessTo        GameAccess[]
+  uploads         Upload[]
+  library         LibraryEntry[]
+  collections     Collection[]
+  wishlist        WishlistEntry[]
+  discoveryViews  DiscoveryView[]
+  playSessions    PlaySession[]
+  announcements   Announcement[]
+  auditLogs       AuditLog[]
+  downloads       DownloadEvent[]
+  buildFiles      BuildFile[]
 
   // ---- Phase 3: Soziales ----
-  profileBackgroundKey String?
-  profileAccent        String?
-  profileVisibility    ProfileVisibility @default(PUBLIC)
-  allowFriendRequests  Boolean          @default(true)
+  profileBackgroundKey   String?
+  profileAccent          String?
+  profileVisibility      ProfileVisibility    @default(PUBLIC)
+  allowFriendRequests    Boolean              @default(true)
   /// Vitrinen auf der Profilseite (JSON-Liste)
-  showcases            Json             @default("[]")
+  showcases              Json                 @default("[]")
   /// Benachrichtigungseinstellungen (JSON)
-  notificationPrefs    Json             @default("{}")
-  lastSeenAt           DateTime?
-  friendRequestsSent     Friendship[]   @relation("FriendRequester")
-  friendRequestsReceived Friendship[]   @relation("FriendAddressee")
-  blocking             Block[]          @relation("Blocker")
-  blockedBy            Block[]          @relation("Blocked")
-  conversationsCreated Conversation[]   @relation("ConversationCreator")
-  conversationMembers  ConversationMember[]
-  messages             Message[]
-  groupsCreated        Group[]          @relation("GroupCreator")
-  groupMemberships     GroupMember[]
-  groupAnnouncements   GroupAnnouncement[]
-  groupEvents          GroupEvent[]
-  eventRsvps           GroupEventRsvp[]
-  reviews              Review[]
-  reviewVotes          ReviewVote[]
-  forumTopics          ForumTopic[]
-  forumPosts           ForumPost[]
-  communityItems       CommunityItem[]
-  communityLikes       CommunityLike[]
-  notifications        Notification[]
-  activities           Activity[]
+  notificationPrefs      Json                 @default("{}")
+  lastSeenAt             DateTime?
+  friendRequestsSent     Friendship[]         @relation("FriendRequester")
+  friendRequestsReceived Friendship[]         @relation("FriendAddressee")
+  blocking               Block[]              @relation("Blocker")
+  blockedBy              Block[]              @relation("Blocked")
+  conversationsCreated   Conversation[]       @relation("ConversationCreator")
+  conversationMembers    ConversationMember[]
+  messages               Message[]
+  groupsCreated          Group[]              @relation("GroupCreator")
+  groupMemberships       GroupMember[]
+  groupAnnouncements     GroupAnnouncement[]
+  groupEvents            GroupEvent[]
+  eventRsvps             GroupEventRsvp[]
+  reviews                Review[]
+  reviewVotes            ReviewVote[]
+  forumTopics            ForumTopic[]
+  forumPosts             ForumPost[]
+  communityItems         CommunityItem[]
+  communityLikes         CommunityLike[]
+  notifications          Notification[]
+  activities             Activity[]
+
+  // ---- Phase 4 ----
+  /// Erfahrungspunkte für das Profil-Level (Abzeichen herstellen, Achievements)
+  xp                    Int                    @default(0)
+  cloudSaves            CloudSave[]
+  achievements          UserAchievement[]
+  gameTokens            GameToken[]
+  workshopItems         WorkshopItem[]
+  workshopRatings       WorkshopRating[]
+  workshopComments      WorkshopComment[]
+  workshopSubscriptions WorkshopSubscription[]
+  cards                 CardItem[]
+  cardDrops             CardDropState[]
+  badges                GameBadge[]
+  tradesSent            TradeOffer[]           @relation("TradeFrom")
+  tradesReceived        TradeOffer[]           @relation("TradeTo")
+  marketListings        MarketListing[]        @relation("MarketSeller")
+  familyMember          FamilyMember?
+  familyInvites         FamilyInvite[]
+  giftsSent             Gift[]                 @relation("GiftFrom")
+  giftsReceived         Gift[]                 @relation("GiftTo")
+  codesCreated          ActivationCode[]
+  codeRedemptions       CodeRedemption[]
+  gameNotes             GameNote[]
 }
 
 model Session {
-  id          String      @id @default(cuid())
-  tokenHash   String      @unique
-  kind        SessionKind
-  name        String?
-  userAgent   String?
-  ip          String?
-  csrfToken   String?
-  createdAt   DateTime    @default(now())
-  lastUsedAt  DateTime    @default(now())
-  expiresAt   DateTime
-  userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String      @id @default(cuid())
+  tokenHash  String      @unique
+  kind       SessionKind
+  name       String?
+  userAgent  String?
+  ip         String?
+  csrfToken  String?
+  createdAt  DateTime    @default(now())
+  lastUsedAt DateTime    @default(now())
+  expiresAt  DateTime
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model LoginChallenge {
-  id         String   @id @default(cuid())
-  tokenHash  String   @unique
+  id         String      @id @default(cuid())
+  tokenHash  String      @unique
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   kind       SessionKind
   deviceName String?
-  attempts   Int      @default(0)
+  attempts   Int         @default(0)
   expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  createdAt  DateTime    @default(now())
 }
 
 model PasswordResetToken {
@@ -228,60 +252,78 @@ model Tag {
 }
 
 model Game {
-  id                 String          @id @default(cuid())
-  slug               String          @unique
+  id                 String         @id @default(cuid())
+  slug               String         @unique
   title              String
-  shortDescription   String          @default("")
-  description        String          @default("")
+  shortDescription   String         @default("")
+  description        String         @default("")
   developer          String?
   publisher          String?
   releaseDate        DateTime?
   website            String?
-  trailerUrls        String[]        @default([])
-  systemRequirements Json            @default("{}")
-  visibility         GameVisibility  @default(HIDDEN)
-  featured           Boolean         @default(false)
+  trailerUrls        String[]       @default([])
+  systemRequirements Json           @default("{}")
+  visibility         GameVisibility @default(HIDDEN)
+  featured           Boolean        @default(false)
   igdbId             String?
   rawgId             String?
-  downloadCount      Int             @default(0)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  downloadCount      Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
   publishedAt        DateTime?
   createdById        String?
-  createdBy          User?           @relation("GameCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy          User?          @relation("GameCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
-  genres             Genre[]
-  tags               Tag[]
-  media              GameMedia[]
-  versions           GameVersion[]
-  maintainers        GameMaintainer[]
-  access             GameAccess[]
-  libraryEntries     LibraryEntry[]
-  wishlistEntries    WishlistEntry[]
-  discoveryViews     DiscoveryView[]
-  playSessions       PlaySession[]
-  collections        CollectionGame[]
-  announcements      Announcement[]
-  downloads          DownloadEvent[]
-  reviews            Review[]
-  forumTopics        ForumTopic[]
-  communityItems     CommunityItem[]
-  groupEvents        GroupEvent[]
-  activities         Activity[]
+  genres          Genre[]
+  tags            Tag[]
+  media           GameMedia[]
+  versions        GameVersion[]
+  maintainers     GameMaintainer[]
+  access          GameAccess[]
+  libraryEntries  LibraryEntry[]
+  wishlistEntries WishlistEntry[]
+  discoveryViews  DiscoveryView[]
+  playSessions    PlaySession[]
+  collections     CollectionGame[]
+  announcements   Announcement[]
+  downloads       DownloadEvent[]
+  reviews         Review[]
+  forumTopics     ForumTopic[]
+  communityItems  CommunityItem[]
+  groupEvents     GroupEvent[]
+  activities      Activity[]
+
+  // ---- Phase 4 ----
+  /// Save-Pfade für Cloud-Saves: [{ platform: "WINDOWS"|"LINUX"|"ANY", path, include?, exclude? }]
+  savePaths       Json             @default("[]")
+  /// Workshop-Inhalte werden nach <Installationsordner>/<workshopPath>/<itemId>/ entpackt (null = Workshop aus)
+  workshopPath    String?
+  /// Altersfreigabe (0, 6, 12, 16, 18)
+  ageRating       Int              @default(0)
+  cloudSaves      CloudSave[]
+  achievements    Achievement[]
+  gameTokens      GameToken[]
+  workshopItems   WorkshopItem[]
+  tradingCards    TradingCard[]
+  cardDrops       CardDropState[]
+  badges          GameBadge[]
+  gifts           Gift[]
+  activationCodes ActivationCode[]
+  notes           GameNote[]
 
   @@index([visibility, publishedAt])
 }
 
 model GameMedia {
-  id          String    @id @default(cuid())
-  gameId      String
-  game        Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  kind        MediaKind
-  storageKey  String
-  mimeType    String
-  size        Int
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(cuid())
+  gameId     String
+  game       Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  kind       MediaKind
+  storageKey String
+  mimeType   String
+  size       Int
+  sortOrder  Int       @default(0)
+  createdAt  DateTime  @default(now())
 
   @@index([gameId, kind])
 }
@@ -321,58 +363,58 @@ model GameVersion {
 }
 
 model Build {
-  id           String      @id @default(cuid())
-  versionId    String
-  version      GameVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  platform     Platform
-  kind         BuildKind
-  status       BuildStatus @default(DRAFT)
-  executable   String      @default("")
-  launchArgs   String      @default("")
-  workingDir   String      @default("")
-  installerArgs String     @default("")
-  linuxRunner  LinuxRunner @default(NONE)
-  installSize  BigInt      @default(0)
-  totalSize    BigInt      @default(0)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  files        BuildFile[]
-  uploads      Upload[]
+  id            String      @id @default(cuid())
+  versionId     String
+  version       GameVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  platform      Platform
+  kind          BuildKind
+  status        BuildStatus @default(DRAFT)
+  executable    String      @default("")
+  launchArgs    String      @default("")
+  workingDir    String      @default("")
+  installerArgs String      @default("")
+  linuxRunner   LinuxRunner @default(NONE)
+  installSize   BigInt      @default(0)
+  totalSize     BigInt      @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  files         BuildFile[]
+  uploads       Upload[]
 
   @@unique([versionId, platform])
 }
 
 model BuildFile {
-  id         String   @id @default(cuid())
-  buildId    String
-  build      Build    @relation(fields: [buildId], references: [id], onDelete: Cascade)
-  path       String
-  size       BigInt
-  sha256     String
-  storageKey String
+  id           String   @id @default(cuid())
+  buildId      String
+  build        Build    @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  path         String
+  size         BigInt
+  sha256       String
+  storageKey   String
   uploadedById String?
-  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
 
   @@unique([buildId, path])
   @@index([uploadedById])
 }
 
 model Upload {
-  id          String       @id @default(cuid())
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  buildId     String
-  build       Build        @relation(fields: [buildId], references: [id], onDelete: Cascade)
-  path        String
-  size        BigInt
-  offset      BigInt       @default(0)
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buildId        String
+  build          Build        @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  path           String
+  size           BigInt
+  offset         BigInt       @default(0)
   expectedSha256 String?
-  sha256      String?
-  status      UploadStatus @default(ACTIVE)
-  error       String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  sha256         String?
+  status         UploadStatus @default(ACTIVE)
+  error          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([userId, status])
 }
@@ -461,17 +503,17 @@ model DownloadEvent {
 }
 
 model Announcement {
-  id          String    @id @default(cuid())
-  title       String
-  body        String
-  published   Boolean   @default(true)
-  pinned      Boolean   @default(false)
-  gameId      String?
-  game        Game?     @relation(fields: [gameId], references: [id], onDelete: SetNull)
-  authorId    String?
-  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  published Boolean  @default(true)
+  pinned    Boolean  @default(false)
+  gameId    String?
+  game      Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AuditLog {
@@ -489,14 +531,14 @@ model AuditLog {
 }
 
 model Backup {
-  id          String       @id @default(cuid())
-  filename    String       @unique
-  size        BigInt       @default(0)
-  includesFiles Boolean    @default(false)
-  status      BackupStatus @default(RUNNING)
-  error       String?
-  createdAt   DateTime     @default(now())
-  finishedAt  DateTime?
+  id            String       @id @default(cuid())
+  filename      String       @unique
+  size          BigInt       @default(0)
+  includesFiles Boolean      @default(false)
+  status        BackupStatus @default(RUNNING)
+  error         String?
+  createdAt     DateTime     @default(now())
+  finishedAt    DateTime?
 }
 
 // ---- Phase 2: Desktop-Client-Releases (Auto-Update über den eigenen Server) ----
@@ -674,13 +716,13 @@ model Group {
 }
 
 model GroupMember {
-  groupId   String
-  userId    String
-  group     Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      GroupRole         @default(MEMBER)
-  status    GroupMemberStatus @default(ACTIVE)
-  joinedAt  DateTime          @default(now())
+  groupId  String
+  userId   String
+  group    Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupRole         @default(MEMBER)
+  status   GroupMemberStatus @default(ACTIVE)
+  joinedAt DateTime          @default(now())
 
   @@id([groupId, userId])
   @@index([userId])
@@ -847,4 +889,369 @@ model Activity {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ---- Phase 4: Steam-Funktionen ----
+
+model CloudSave {
+  id          String    @id @default(cuid())
+  userId      String
+  gameId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game        Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  version     Int
+  storageKey  String
+  size        BigInt
+  /// Inhaltskennung: SHA-256 über das sortierte Manifest
+  contentHash String
+  /// [{ root, path, size, sha256, mtime }]
+  manifest    Json
+  deviceName  String?
+  platform    Platform?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, gameId, version])
+  @@index([userId, gameId, createdAt])
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  gameId      String
+  game        Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  /// Stabile Kennung für SDK-Aufrufe (z. B. "FIRST_BLOOD")
+  apiName     String
+  name        String
+  description String            @default("")
+  iconKey     String?
+  hidden      Boolean           @default(false)
+  sortOrder   Int               @default(0)
+  /// Zielwert für Fortschritts-Achievements (null = einfach freischalten)
+  progressMax Int?
+  /// Optionale Erkennung durch den Client: { type: "file_exists"|"file_regex"|"log_regex", path, pattern? }
+  detection   Json?
+  createdAt   DateTime          @default(now())
+  unlocks     UserAchievement[]
+
+  @@unique([gameId, apiName])
+  @@index([gameId, sortOrder])
+}
+
+model UserAchievement {
+  userId        String
+  achievementId String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  progress      Int         @default(0)
+  unlockedAt    DateTime?
+  /// sdk | detect | admin
+  source        String      @default("sdk")
+
+  @@id([userId, achievementId])
+  @@index([achievementId, unlockedAt])
+  @@index([userId, unlockedAt])
+}
+
+/// Kurzlebiges Token pro Spielstart für das Achievement-SDK (nur ein Spiel, nur SDK-Endpunkte)
+model GameToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  gameId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+enum WorkshopKind {
+  MOD
+  MAP
+  OTHER
+}
+
+model WorkshopItem {
+  id            String                 @id @default(cuid())
+  gameId        String
+  game          Game                   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  authorId      String?
+  author        User?                  @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  title         String
+  description   String                 @default("")
+  kind          WorkshopKind           @default(MOD)
+  tags          String[]               @default([])
+  previewKey    String?
+  /// Von Moderation ausgeblendet
+  hidden        Boolean                @default(false)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  versions      WorkshopVersion[]
+  ratings       WorkshopRating[]
+  comments      WorkshopComment[]
+  subscriptions WorkshopSubscription[]
+
+  @@index([gameId, createdAt])
+}
+
+model WorkshopVersion {
+  id        String       @id @default(cuid())
+  itemId    String
+  item      WorkshopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  version   String
+  changelog String       @default("")
+  fileKey   String
+  fileName  String
+  size      BigInt
+  sha256    String
+  createdAt DateTime     @default(now())
+
+  @@unique([itemId, version])
+  @@index([itemId, createdAt])
+}
+
+model WorkshopRating {
+  itemId String
+  userId String
+  item   WorkshopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  up     Boolean
+
+  @@id([itemId, userId])
+}
+
+model WorkshopComment {
+  id        String       @id @default(cuid())
+  itemId    String
+  item      WorkshopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  body      String
+  createdAt DateTime     @default(now())
+
+  @@index([itemId, createdAt])
+}
+
+model WorkshopSubscription {
+  itemId    String
+  userId    String
+  item      WorkshopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@id([itemId, userId])
+  @@index([userId])
+}
+
+model TradingCard {
+  id        String          @id @default(cuid())
+  gameId    String
+  game      Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  name      String
+  imageKey  String?
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  items     CardItem[]
+  wantedIn  MarketListing[] @relation("MarketWant")
+
+  @@index([gameId, sortOrder])
+}
+
+model CardItem {
+  id         String           @id @default(cuid())
+  ownerId    String
+  owner      User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cardId     String
+  card       TradingCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  foil       Boolean          @default(false)
+  /// drop | trade | market | admin
+  source     String           @default("drop")
+  acquiredAt DateTime         @default(now())
+  tradeItems TradeOfferItem[]
+  listing    MarketListing?   @relation("MarketItem")
+
+  @@index([ownerId, cardId])
+}
+
+model CardDropState {
+  userId          String
+  gameId          String
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game            Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  drops           Int    @default(0)
+  /// Bereits für Drops angerechnete Spielzeit (Sekunden)
+  creditedSeconds Int    @default(0)
+
+  @@id([userId, gameId])
+}
+
+model GameBadge {
+  userId    String
+  gameId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  level     Int      @default(0)
+  foil      Boolean  @default(false)
+  craftedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, gameId])
+}
+
+enum TradeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+enum TradeSide {
+  GIVE
+  RECEIVE
+}
+
+model TradeOffer {
+  id        String           @id @default(cuid())
+  fromId    String
+  toId      String
+  from      User             @relation("TradeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User             @relation("TradeTo", fields: [toId], references: [id], onDelete: Cascade)
+  message   String           @default("")
+  status    TradeStatus      @default(PENDING)
+  createdAt DateTime         @default(now())
+  decidedAt DateTime?
+  items     TradeOfferItem[]
+
+  @@index([toId, status])
+  @@index([fromId, status])
+}
+
+model TradeOfferItem {
+  offerId String
+  itemId  String
+  offer   TradeOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  item    CardItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  side    TradeSide
+
+  @@id([offerId, itemId])
+}
+
+enum ListingStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+/// Marktplatz ohne Geld: „biete Karte X, suche Karte Y“
+model MarketListing {
+  id          String        @id @default(cuid())
+  sellerId    String
+  seller      User          @relation("MarketSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  itemId      String        @unique
+  item        CardItem      @relation("MarketItem", fields: [itemId], references: [id], onDelete: Cascade)
+  wantCardId  String
+  wantCard    TradingCard   @relation("MarketWant", fields: [wantCardId], references: [id], onDelete: Cascade)
+  status      ListingStatus @default(OPEN)
+  buyerId     String?
+  createdAt   DateTime      @default(now())
+  completedAt DateTime?
+
+  @@index([status, wantCardId])
+}
+
+model FamilyGroup {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  members   FamilyMember[]
+  invites   FamilyInvite[]
+}
+
+enum FamilyRole {
+  ADULT
+  CHILD
+}
+
+model FamilyMember {
+  familyId         String
+  userId           String      @unique
+  family           FamilyGroup @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role             FamilyRole
+  joinedAt         DateTime    @default(now())
+  // Kindersicherung (nur für CHILD wirksam)
+  maxAgeRating     Int         @default(18)
+  /// Tägliches Spielzeitlimit in Minuten (null = unbegrenzt)
+  dailyMinutes     Int?
+  chatAllowed      Boolean     @default(true)
+  communityAllowed Boolean     @default(true)
+
+  @@id([familyId, userId])
+}
+
+model FamilyInvite {
+  id        String      @id @default(cuid())
+  familyId  String
+  family    FamilyGroup @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      FamilyRole
+  createdAt DateTime    @default(now())
+
+  @@unique([familyId, userId])
+}
+
+model Gift {
+  id        String    @id @default(cuid())
+  gameId    String
+  game      Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  fromId    String?
+  from      User?     @relation("GiftFrom", fields: [fromId], references: [id], onDelete: SetNull)
+  toId      String
+  to        User      @relation("GiftTo", fields: [toId], references: [id], onDelete: Cascade)
+  message   String    @default("")
+  createdAt DateTime  @default(now())
+  openedAt  DateTime?
+
+  @@index([toId, openedAt])
+}
+
+model ActivationCode {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  gameId      String
+  game        Game             @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  batch       String           @default("")
+  note        String           @default("")
+  maxUses     Int              @default(1)
+  uses        Int              @default(0)
+  expiresAt   DateTime?
+  revoked     Boolean          @default(false)
+  createdById String?
+  createdBy   User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now())
+  redemptions CodeRedemption[]
+
+  @@index([gameId, batch])
+}
+
+model CodeRedemption {
+  codeId     String
+  userId     String
+  code       ActivationCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redeemedAt DateTime       @default(now())
+
+  @@id([codeId, userId])
+}
+
+model GameNote {
+  userId    String
+  gameId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  body      String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, gameId])
 }

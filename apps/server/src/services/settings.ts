@@ -17,6 +17,16 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   voiceEnabled: false,
   gifsEnabled: true,
   maxChatImageBytes: 8 * 1024 ** 2,
+  cloudSavesEnabled: true,
+  cloudSaveVersions: 10,
+  cloudQuotaBytes: 1024 ** 3,
+  workshopEnabled: true,
+  maxWorkshopFileBytes: 2 * 1024 ** 3,
+  cardsEnabled: true,
+  marketEnabled: true,
+  giftsEnabled: true,
+  cardDropMinutes: 30,
+  discordAppId: '',
 };
 
 /** Persistente Admin-Einstellungen mit In-Memory-Cache. */

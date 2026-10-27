@@ -2,14 +2,14 @@ import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-export type StorageArea = 'builds' | 'media' | 'avatars' | 'uploads' | 'backups' | 'tmp' | 'client' | 'social';
+export type StorageArea = 'builds' | 'media' | 'avatars' | 'uploads' | 'backups' | 'tmp' | 'client' | 'social' | 'cloud' | 'workshop';
 
 /** Dateiablage auf dem Volume (DATA_DIR). Keys sind relative Pfade wie "builds/<buildId>/<fileId>". */
 export class Storage {
   constructor(public readonly root: string) {}
 
   async init(): Promise<void> {
-    for (const area of ['builds', 'media', 'avatars', 'uploads', 'backups', 'tmp', 'client', 'social'] as StorageArea[]) {
+    for (const area of ['builds', 'media', 'avatars', 'uploads', 'backups', 'tmp', 'client', 'social', 'cloud', 'workshop'] as StorageArea[]) {
       await fs.mkdir(path.join(this.root, area), { recursive: true });
     }
   }

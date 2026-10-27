@@ -35,6 +35,8 @@ import { UrlSigner } from './lib/sign.js';
 import { ActivityService, NotificationService } from './services/notify.js';
 import { PresenceService } from './services/social.js';
 import { ChatService } from './services/chat.js';
+import { AchievementService } from './services/achievements.js';
+import { CardService } from './services/cards.js';
 import { startEventReminders } from './services/groups.js';
 
 // BigInt (Dateigrößen) sicher als Zahl serialisieren.
@@ -79,6 +81,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   ctx.activity = new ActivityService(ctx);
   ctx.presence = new PresenceService(ctx);
   ctx.chat = new ChatService(ctx);
+  ctx.achievements = new AchievementService(ctx);
+  ctx.cards = new CardService(ctx);
   ctx.signer = new UrlSigner(await ctx.settings.appSecret(config.APP_SECRET));
   ctx.presence.start();
   app.decorate('ctx', ctx);

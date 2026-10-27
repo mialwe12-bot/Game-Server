@@ -1,5 +1,5 @@
 import type { Prisma, User } from '@prisma/client';
-import type { GameDetail, GameSummary } from '@gameserver/shared';
+import type { GameDetail, GameSummary, SavePathConfig } from '@gameserver/shared';
 import type { AppContext } from '../context.js';
 import { forbidden, notFound, unauthorized } from '../lib/errors.js';
 import { DAY_MS } from '../lib/time.js';
@@ -114,7 +114,7 @@ export async function gameDetail(ctx: AppContext, user: User | null, idOrSlug: s
         },
       },
       announcements: { where: { published: true }, include: announcementInclude, orderBy: { createdAt: 'desc' }, take: 5 },
-      _count: { select: { libraryEntries: true } },
+      _count: { select: { libraryEntries: true, achievements: true, tradingCards: true, workshopItems: { where: { hidden: false } } } },
     },
   });
   const [entry, wish] = user
@@ -150,6 +150,12 @@ export async function gameDetail(ctx: AppContext, user: User | null, idOrSlug: s
     playtimeSeconds: entry?.playtimeSeconds ?? 0,
     canEdit,
     announcements: game.announcements.map(announcementDto),
+    ageRating: game.ageRating,
+    savePaths: Array.isArray(game.savePaths) ? (game.savePaths as unknown as SavePathConfig[]) : [],
+    workshopPath: game.workshopPath,
+    achievementCount: game._count.achievements,
+    cardCount: game._count.tradingCards,
+    workshopCount: game._count.workshopItems,
     createdAt: game.createdAt.toISOString(),
     updatedAt: game.updatedAt.toISOString(),
   };

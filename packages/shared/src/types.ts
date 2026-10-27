@@ -94,6 +94,16 @@ export interface PublicSettings {
   smtpEnabled: boolean;
   metadataProviders: { igdb: boolean; rawg: boolean };
   version: string;
+  /** Phase 4: aktivierte Funktionen */
+  features: {
+    cloudSaves: boolean;
+    workshop: boolean;
+    cards: boolean;
+    market: boolean;
+    gifts: boolean;
+  };
+  /** Discord-Application-ID für Rich Presence im Desktop-Client (leer = aus) */
+  discordAppId: string;
 }
 
 export interface BackupSchedule {
@@ -121,6 +131,20 @@ export interface AdminSettings {
   /** GIF-Suche im Chat (nur wirksam mit TENOR_API_KEY) */
   gifsEnabled: boolean;
   maxChatImageBytes: number;
+  // Phase 4
+  cloudSavesEnabled: boolean;
+  /** Aufbewahrte Versionen pro Spiel und Nutzer */
+  cloudSaveVersions: number;
+  /** Cloud-Speicher pro Nutzer in Bytes (0 = unbegrenzt) */
+  cloudQuotaBytes: number;
+  workshopEnabled: boolean;
+  maxWorkshopFileBytes: number;
+  cardsEnabled: boolean;
+  marketEnabled: boolean;
+  giftsEnabled: boolean;
+  /** Minuten Spielzeit pro Karten-Drop */
+  cardDropMinutes: number;
+  discordAppId: string;
 }
 
 export interface GenreDto {
@@ -224,6 +248,13 @@ export interface GameDetail extends GameSummary {
   announcements: AnnouncementDto[];
   createdAt: string;
   updatedAt: string;
+  // Phase 4
+  ageRating: number;
+  savePaths: import('./steam.js').SavePathConfig[];
+  workshopPath: string | null;
+  achievementCount: number;
+  cardCount: number;
+  workshopCount: number;
 }
 
 /** Vollständige Spieldaten für die Verwaltung (Admin/Uploader). */
@@ -429,7 +460,13 @@ export type WsEvent =
   | { type: 'chat.conversation'; data: { conversationId: string } }
   | { type: 'friends.changed'; data: Record<string, never> }
   | { type: 'voice.participants'; data: { conversationId: string; userIds: string[] } }
-  | { type: 'voice.signal'; data: { conversationId: string; from: string; signal: unknown } };
+  | { type: 'voice.signal'; data: { conversationId: string; from: string; signal: unknown } }
+  // Phase 4
+  | { type: 'achievement.unlocked'; data: { achievement: import('./steam.js').AchievementDto; game: import('./steam.js').GameRef } }
+  | { type: 'remote.command'; data: import('./steam.js').RemoteCommand & { from: string } }
+  | { type: 'cloud.updated'; data: { gameId: string; version: number } }
+  | { type: 'workshop.updated'; data: { itemId: string; gameId: string } }
+  | { type: 'inventory.changed'; data: Record<string, never> };
 
 /** Nachrichten vom Client an den Server über den WebSocket */
 export type WsClientMessage =

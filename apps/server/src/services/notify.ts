@@ -3,7 +3,7 @@ import type { NotificationDto, NotificationPrefs, NotificationType } from '@game
 import type { AppContext } from '../context.js';
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
-  email: { friends: true, messages: false, groups: true, events: true, community: false },
+  email: { friends: true, messages: false, groups: true, events: true, community: false, trading: false },
 };
 
 /** Welche E-Mail-Einstellung für welchen Typ gilt */
@@ -20,6 +20,13 @@ const CATEGORY: Record<NotificationType, keyof NotificationPrefs['email']> = {
   'event.reminder': 'events',
   'review.helpful': 'community',
   'forum.reply': 'community',
+  'card.drop': 'trading',
+  'trade.offer': 'trading',
+  'trade.accepted': 'trading',
+  'market.completed': 'trading',
+  'gift.received': 'friends',
+  'family.invite': 'friends',
+  'workshop.comment': 'community',
 };
 
 export function notificationPrefs(raw: unknown): NotificationPrefs {
@@ -53,6 +60,13 @@ export function emailText(type: NotificationType, data: Record<string, string>, 
     'event.reminder': [`Gleich geht's los: ${data.title ?? ''}`, `Starting soon: ${data.title ?? ''}`],
     'review.helpful': [`Dein Review zu ${data.gameTitle ?? ''} wurde als hilfreich bewertet`, `Your review of ${data.gameTitle ?? ''} was rated helpful`],
     'forum.reply': [`Neue Antwort in „${data.title ?? ''}“`, `New reply in "${data.title ?? ''}"`],
+    'card.drop': [`Neue Sammelkarte: ${data.title ?? ''} (${data.gameTitle ?? ''})`, `New trading card: ${data.title ?? ''} (${data.gameTitle ?? ''})`],
+    'trade.offer': [`${who} schlägt dir einen Tausch vor`, `${who} sent you a trade offer`],
+    'trade.accepted': [`${who} hat deinen Tausch angenommen`, `${who} accepted your trade offer`],
+    'market.completed': [`Dein Marktplatz-Angebot wurde getauscht`, `Your market listing was traded`],
+    'gift.received': [`${who} hat dir ${data.gameTitle ?? 'ein Spiel'} geschenkt`, `${who} gave you ${data.gameTitle ?? 'a game'}`],
+    'family.invite': [`Einladung in die Familie ${data.familyName ?? ''}`, `Invitation to the family ${data.familyName ?? ''}`],
+    'workshop.comment': [`Neuer Kommentar zu „${data.title ?? ''}“`, `New comment on "${data.title ?? ''}"`],
   };
   const [subjectDe, subjectEn] = map[type];
   const subject = de ? subjectDe : subjectEn;

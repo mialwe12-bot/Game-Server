@@ -7,6 +7,9 @@ import { safeEqual, sha256Hex } from '../lib/crypto.js';
 import { DAY_MS } from '../lib/time.js';
 import { clearSessionCookies, extractBearer, SESSION_COOKIE } from '../services/sessions.js';
 
+/** Präfix der Spiel-Tokens für das Achievement-SDK */
+export const GAME_TOKEN_PREFIX = 'gsg_';
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -20,11 +23,13 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
 
   app.addHook('onRequest', async (req, reply) => {
     const { db, config } = app.ctx;
-    const bearer = extractBearer(req);
-    const cookie = req.cookies[SESSION_COOKIE];
+    const rawBearer = extractBearer(req);
+    // Spiel-Tokens des Achievement-SDK (gsg_…) prüfen die SDK-Routen selbst
+    const bearer = rawBearer?.startsWith(GAME_TOKEN_PREFIX) ? null : rawBearer;
+    const cookie = rawBearer?.startsWith(GAME_TOKEN_PREFIX) ? undefined : req.cookies[SESSION_COOKIE];
     const token = bearer ?? cookie;
     if (!token) return;
-    const session = await db.session.findUnique({ where: { tokenHash: sha256Hex(token) }, include: { user: true } });
+    const session = await db.session.findUnique({ where: { tokenHash: sha256Hex(token) }, include: { user: { include: { familyMember: true } } } });
     const expectedKind = bearer ? 'DEVICE' : 'WEB';
     if (!session || session.kind !== expectedKind || session.expiresAt < new Date() || session.user.disabled) {
       if (!bearer && cookie) clearSessionCookies(app.ctx, reply);

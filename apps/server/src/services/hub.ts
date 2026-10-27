@@ -92,6 +92,11 @@ export class Hub {
     return false;
   }
 
+  isSessionOnline(sessionId: string): boolean {
+    for (const c of this.clients) if (c.sessionId === sessionId && c.socket.readyState === 1) return true;
+    return false;
+  }
+
   onlineUserIds(): Set<string> {
     return new Set([...this.clients].map((c) => c.userId).filter((x): x is string => !!x));
   }

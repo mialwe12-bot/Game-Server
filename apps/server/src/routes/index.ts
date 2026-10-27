@@ -16,6 +16,15 @@ import { friendRoutes } from './friends.js';
 import { groupRoutes } from './groups.js';
 import { notificationRoutes } from './notifications.js';
 import { profileRoutes } from './profiles.js';
+import { achievementRoutes } from './achievements.js';
+import { cardRoutes } from './cards.js';
+import { cloudRoutes } from './cloud.js';
+import { deviceRoutes } from './devices.js';
+import { familyRoutes } from './family.js';
+import { giftRoutes } from './gifts.js';
+import { playRoutes, sdkRoutes } from './sdk.js';
+import { statsRoutes } from './stats.js';
+import { workshopRoutes } from './workshop.js';
 
 export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(systemRoutes);
@@ -36,5 +45,16 @@ export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(chatRoutes, { prefix: '/chat' });
   await app.register(groupRoutes, { prefix: '/groups' });
   await app.register(communityRoutes, { prefix: '/community' });
+  // Phase 4 – Steam-Funktionen
+  await app.register(cloudRoutes, { prefix: '/cloud' });
+  await app.register(achievementRoutes, { prefix: '/achievements' });
+  await app.register(playRoutes);
+  await app.register(sdkRoutes, { prefix: '/sdk' });
+  await app.register(workshopRoutes, { prefix: '/workshop' });
+  await app.register(cardRoutes, { prefix: '/cards' });
+  await app.register(familyRoutes, { prefix: '/family' });
+  await app.register(giftRoutes);
+  await app.register(statsRoutes, { prefix: '/stats' });
+  await app.register(deviceRoutes);
   app.get('/openapi.json', { schema: { hide: true }, config: { allowInMaintenance: true } }, async () => app.swagger());
 };

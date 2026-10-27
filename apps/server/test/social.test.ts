@@ -160,7 +160,7 @@ describe('Profile', () => {
   });
 
   it('Abzeichen werden aus Meilensteinen berechnet', () => {
-    const badges = computeBadges({ games: 30, playtimeSeconds: 120 * 3600, reviews: 0, friends: 5, screenshots: 0, groups: 0 }, new Date(Date.now() - 400 * 86400_000));
+    const badges = computeBadges({ games: 30, playtimeSeconds: 120 * 3600, reviews: 0, friends: 5, screenshots: 0, groups: 0, achievements: 0 }, new Date(Date.now() - 400 * 86400_000));
     expect(badges).toEqual(
       expect.arrayContaining([
         { id: 'collector', level: 2, value: 30 },

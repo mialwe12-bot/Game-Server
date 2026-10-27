@@ -118,6 +118,7 @@ const BADGE_LEVELS: Record<string, number[]> = {
   social: [5, 25, 100],
   photographer: [1, 10, 50],
   veteran: [1, 2, 5],
+  hunter: [10, 50, 200, 500],
 };
 
 /** Automatische Abzeichen aus Meilensteinen (eigene Abzeichen-/Level-Systeme folgen in Phase 4). */
@@ -130,6 +131,7 @@ export function computeBadges(stats: ProfileStats, memberSince: Date, now = Date
     social: stats.friends,
     photographer: stats.screenshots,
     veteran: years,
+    hunter: stats.achievements,
   };
   const badges: BadgeDto[] = [];
   for (const [id, levels] of Object.entries(BADGE_LEVELS)) {

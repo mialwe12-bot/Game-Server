@@ -147,7 +147,9 @@ export const libraryRoutes: FastifyPluginAsyncZod = async (app) => {
         }),
         ctx.db.playSession.create({ data: { userId: user.id, gameId: entry.gameId, startedAt, endedAt, seconds } }),
       ]);
-      return { playtimeSeconds: updated.playtimeSeconds };
+      // Sammelkarten-Drops nach Spielzeit
+      const drops = await ctx.cards.dropForPlaytime(user.id, entry.gameId, updated.playtimeSeconds).catch(() => []);
+      return { playtimeSeconds: updated.playtimeSeconds, cardDrops: drops.length };
     },
   );
 

@@ -112,6 +112,44 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - Benachrichtigungs-`path` muss eine existierende Web-Route sein (z. B. `/groups/<slug>`, `/game/<slug>/reviews`).
 - E2E-Skripte (Playwright) lagen nur im Scratchpad; Testnutzer in der Dev-DB: admin/admin-passwort-123, bob/testpasswort-123.
 
+## Phase 4 – Auftrag (wörtlich aus der Erstbeschreibung, Punkte 16–26)
+16. Cloud-Saves: Pro Spiel definierte Save-Pfade/-Muster (Windows %APPDATA% usw., Linux XDG/Prefix), automatisches Hoch-/Runterladen beim Start/Ende, Versionierung, Konfliktdialog.
+17. Achievements: Admin legt sie pro Spiel an (Icon, Name, Beschreibung, versteckt), Freischaltung über eine kleine API/SDK-Bibliothek, optional Erkennung per Dateien/Logs, Seltenheit in Prozent, Fortschritt, Profil-Showcase.
+18. Workshop: Mods/Maps pro Spiel hochladen, Versionen, Bewertungen, Kommentare, Abonnieren; der Client lädt abonnierte Inhalte automatisch nach.
+19. Sammelkarten, Abzeichen, Profil-Level, Marktplatz zum Tauschen (alles ohne echtes Geld, Admin kann abschalten).
+20. Screenshots: Hotkey im Spiel, Screenshot-Manager, Hochladen in die Community.
+21. Ingame-Overlay (Hotkey): Chat, Freunde, Achievements, Browser, Notizen. Wenn technisch zu aufwändig, als eigenständiges Always-on-top-Fenster umsetzen und das ehrlich dokumentieren.
+22. Familienbibliothek/Freigabe, Geschenke und Aktivierungscodes, Altersfreigaben/Kindersicherung.
+23. Big-Picture-Modus: Vollbild-Oberfläche mit Controller-Navigation (Gamepad API), Steam-Deck-tauglich.
+24. Remote Play: Streaming des Spiels an einen anderen Client (Sunshine/Moonlight- oder WebRTC-Anbindung), Remote-Download auf andere Geräte.
+25. Steam-Integration: Spiele als Non-Steam-Shortcuts ins Steam synchronisieren, Discord Rich Presence, Import vorhandener Spielordner (Auto-Erkennung).
+26. Statistiken: Spielzeit pro Spiel/Woche, Jahresrückblick, globale Top-Listen.
+
+## Phase 4 – Plan/Entscheidungen
+- Achievement-SDK: Client startet Spiele mit Env `GS_API_URL`, `GS_GAME_ID`, `GS_GAME_TOKEN` (Spielsitzungs-Token `gsg_…`,
+  24 h, nur für dieses Spiel/diesen Nutzer, nur SDK-Endpunkte `/api/sdk/*`). SDKs: TypeScript (`packages/sdk`), Python, C (libcurl).
+  Erkennung per Datei/Log (Achievement.detection) wertet der Client aus.
+- Cloud-Saves: Save-Pfade pro Spiel/Plattform (Platzhalter %APPDATA%, %LOCALAPPDATA%, %USERPROFILE%, %DOCUMENTS%, $HOME,
+  $XDG_DATA_HOME, $XDG_CONFIG_HOME, {install}, {prefix}); Client packt Dateien als ZIP + Manifest (SHA-256), Server
+  versioniert (Anzahl einstellbar), Konflikt = lokale Änderung UND neuere Server-Version seit letztem Sync → Dialog.
+- Workshop: Upload per Multipart-Stream (Größenlimit Einstellung), Versionen, Daumen-Bewertung, Kommentare, Abos;
+  Client entpackt Abos nach `<install>/<Game.workshopPath>/<itemId>/`.
+- Karten: Admin definiert Karten pro Spiel; Drops nach Spielzeit (alle 30 min, max. halbes Set pro Spiel);
+  komplettes Set → Abzeichen-Stufe (max 5) + XP → Profil-Level; Tausch per Angebot zwischen Nutzern + Marktplatz-Gesuche
+  (Karte gegen Karte), Admin-Schalter `cardsEnabled`/`marketEnabled`.
+- Screenshots: globaler Hotkey (F12) im Client, Aufnahme per Rust-Crate, lokaler Manager, Upload als Community-Screenshot.
+- Overlay: eigenes Always-on-top-Fenster (Tauri), Hotkey Shift+Tab, Route `/overlay` (Freunde, Chat, Achievements,
+  Browser-Fenster, Notizen pro Spiel – Notizen serverseitig). KEIN Grafik-Hooking (ehrlich dokumentiert).
+- Familie: Familiengruppe (Erwachsene/Kinder), Familienbibliothek (Zugriff auf eingeschränkte Spiele der Erwachsenen),
+  Geschenke (in Bibliothek des Empfängers + ggf. Zugriff), Aktivierungscodes (Admin, Charge pro Spiel), Altersfreigabe pro
+  Spiel (USK/PEGI-Stufe 0/6/12/16/18) + Kindersicherung (max. Altersstufe, Tageslimit Spielzeit, Chat/Store-Beschränkung).
+- Big Picture: Route `/big-picture` mit räumlicher Fokusnavigation (Gamepad API + Tastatur), Client startet im Gaming-Mode darin.
+- Remote Play: Sunshine-Anbindung (apps.json synchronisieren) + Moonlight-Hinweise; Remote-Download/Start per WS an andere
+  eigene Geräte (Device-Sessions).
+- Steam: shortcuts.vdf (binäres VDF) schreiben, Discord Rich Presence (Discord-App-ID in Admin-Einstellungen), Ordner-Import
+  (Zuordnung per Name + Abgleich mit Build-Manifest).
+- Statistiken: aus PlaySession – pro Woche/Spiel, Jahresrückblick, globale Top-Listen.
+
 ## Konventionen
 
 - Code-Kommentare und UI-Texte auf Deutsch (UI zusätzlich Englisch), Fehlermeldungen der API auf Deutsch mit maschinenlesbarem `error`-Code.
