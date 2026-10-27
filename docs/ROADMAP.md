@@ -58,22 +58,32 @@ fortsetzbare Upload aus `packages/shared` werden wiederverwendet.
 Bewusste Einschränkungen: Sprachchat-Mesh für kleine Runden (≤ ~6), kein eigener Medienserver; GIF-Suche nur mit Tenor-Schlüssel;
 Abzeichen nur aus Meilensteinen (Sammelkarten/Level in Phase 4).
 
-## Phase 4 – Steam-Features
+## ✅ Phase 4 – Steam-Features (fertig)
 
-Cloud-Saves, Achievements (+ SDK), Workshop, Sammelkarten/Abzeichen/Level/Marktplatz (ohne Geld), Screenshots per Hotkey,
-Overlay, Familienfreigabe/Geschenke/Codes/Kindersicherung, Big-Picture-Modus (Gamepad API), Remote Play, Steam-Integration
-(Non-Steam-Shortcuts, Discord Rich Presence, Import vorhandener Ordner), Statistiken/Jahresrückblick/Top-Listen.
+- **Cloud-Saves**: Save-Pfade pro Spiel/Plattform mit Platzhaltern (Windows-Pfade im Wine/Proton-Präfix), Ein-/Ausschluss-
+  muster, Abgleich vor dem Start und nach dem Ende (ZIP + SHA-256-Manifest), Versionierung, Kontingent, Wiederherstellen,
+  **Konfliktdialog** (lokal geändert und neuere Server-Version seit dem letzten Abgleich)
+- **Achievements**: Verwaltung pro Spiel (Icon, versteckt, Fortschritt, Reihenfolge, Support-Vergabe), **SDK** in TypeScript,
+  Python und C (Spielsitzungs-Token `gsg_…` per Umgebung, Offline-Puffer), optionale **Datei-/Log-Erkennung** im Client,
+  Seltenheit, Profil-Vitrine, Abzeichen „Jäger“
+- **Workshop**: Inhalte mit Versionen, Vorschaubild, Tags, Bewertung, Kommentaren, Abos; Client installiert Abos automatisch
+- **Sammelkarten/Abzeichen/Level/Marktplatz** (ohne Geld, abschaltbar): Drops nach Spielzeit, Abzeichen bis Stufe 5, EP und
+  Profil-Level, Tauschangebote, Marktplatz Karte gegen Karte
+- **Screenshots** (globaler Hotkey F12, Manager, Upload in die Community)
+- **Overlay** als eigenständiges Always-on-top-Fenster (Shift+Tab): Freunde, Chat, Achievements, Browser, Notizen, Screenshots
+- **Familie**: Familienbibliothek, Geschenke, Aktivierungscodes (Chargen, CSV), Altersfreigaben, Kindersicherung
+  (Altersstufe, Tageslimit mit Warnung und Spielende, Chat/Community)
+- **Big Picture** (`/big-picture`) mit Gamepad-API-Fokusnavigation, Start im Gaming-Mode
+- **Remote Play** über Sunshine/Moonlight (`apps.json`-Abgleich) und Remote-Download/-Start auf eigene Geräte
+- **Steam-Integration**: `shortcuts.vdf` (binäres VDF), Discord Rich Presence, Import vorhandener Spielordner
+- **Statistiken**: Spielzeit pro Woche/Spiel, Jahresrückblick, globale Top-Listen
 
-Vorab-Hinweise zu technisch eingeschränkten Features:
+Ehrlich dokumentierte Einschränkungen (Details im README): Overlay ohne Grafik-Hook (nicht über exklusivem Vollbild bzw.
+Gamescope), Screenshots über System-APIs, Remote Play über Sunshine statt eigenem Streaming, Datei-/Log-Erkennung als
+Heuristik, Discord benötigt eine Anwendungs-ID, Steam muss beim Verknüpfungs-Abgleich geschlossen sein.
 
-- **Ingame-Overlay**: Ein echtes Overlay erfordert DLL-/Vulkan-/OpenGL-Hooking pro Grafik-API (und wird von Anti-Cheat
-  teils blockiert). Pragmatisch: ein eigenständiges **Always-on-top-Fenster** (Tauri), per globalem Hotkey ein-/ausblendbar;
-  unter Linux zusätzlich optional MangoHud-/gamescope-Integration. Funktioniert nicht über exklusiven Vollbildmodus.
-- **Remote Play**: Eigenes Video-Streaming mit niedriger Latenz ist sehr aufwändig. Pragmatisch: Anbindung an
-  **Sunshine/Moonlight** (Client startet Spiel und registriert es bei Sunshine) sowie **Remote-Download** (Download auf einem
-  anderen eigenen Gerät per WebSocket-Befehl auslösen).
-- **Screenshots per Hotkey im Spiel**: Ohne Overlay-Hook nur über globale Hotkeys + System-Screenshot-APIs (funktioniert in
-  Fenster/Borderless, nicht zuverlässig im exklusiven Vollbild).
-- **Cloud-Saves**: Nur für Spiele mit vom Admin definierten Save-Pfaden; Konflikterkennung über Zeitstempel + Hash.
-- **Achievement-Erkennung per Datei/Log**: Heuristisch und spielspezifisch – zuverlässig ist nur das SDK.
-- **Discord Rich Presence** benötigt eine (kostenlose) Discord-Application-ID des Betreibers.
+## Mögliche nächste Schritte (außerhalb des ursprünglichen Auftrags)
+
+- Coverbilder für Steam-Verknüpfungen (`grid/`) und Sunshine
+- Echte Overlay-Integration unter Linux über MangoHud/vkBasalt-Layer bzw. Gamescope
+- SFU (z. B. LiveKit) für große Sprachkanäle

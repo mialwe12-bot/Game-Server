@@ -22,9 +22,10 @@ Download-Manager sind Pflicht.
 - **Phase 1 fertig** (Server, Web-Store, Admin, Docker, Tests, CI, README).
 - **Phase 2 fertig** (Desktop-Client im Repo `game-client`, siehe dessen CLAUDE.md; Frontend-Desktop-Modus hier in
   `apps/web/src/desktop/`, Client-Releases/Updater in `apps/server/src/routes/client.ts`).
-- **Phase 3 fertig** (Soziales, siehe Abschnitt unten). Version noch 0.2.0 (bei Release auf 0.3.0 heben).
-- Nächster Schritt: **Phase 4 – Steam-Features** – erst auf Anweisung des Nutzers starten; Hinweise zu Einschränkungen stehen in
-  `docs/ROADMAP.md` (Overlay, Remote Play, Hotkey-Screenshots, Cloud-Saves, Achievements, Discord).
+- **Phase 3 fertig** (Soziales, siehe Abschnitt unten).
+- **Phase 4 fertig** (Steam-Features, siehe „Phase 4 – Plan/Entscheidungen“ und „Phase 4 – Umsetzung“). Version 0.4.0
+  (Server, Web, shared, Client).
+- Alle vier Phasen des ursprünglichen Auftrags sind erledigt. Ideen für danach: `docs/ROADMAP.md` (Ende).
 
 ## Architektur & Entscheidungen
 
@@ -149,6 +150,24 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - Steam: shortcuts.vdf (binäres VDF) schreiben, Discord Rich Presence (Discord-App-ID in Admin-Einstellungen), Ordner-Import
   (Zuordnung per Name + Abgleich mit Build-Manifest).
 - Statistiken: aus PlaySession – pro Woche/Spiel, Jahresrückblick, globale Top-Listen.
+
+## Phase 4 – Umsetzung (Ergänzungen)
+- Server: Migration `steam_features`; Routen `cloud.ts`, `achievements.ts`, `sdk.ts` (playRoutes `/play/:gameId/start`,
+  `/me/parental` + sdkRoutes `/sdk/*`), `workshop.ts`, `cards.ts`, `family.ts`, `gifts.ts` (+ `/codes/*`), `stats.ts`,
+  `devices.ts` (+ `/notes/:gameId`); Dienste `access.ts` (Familie + Altersfilter in store/viewable/canView),
+  `achievements.ts`, `cards.ts`, `family.ts`, `workshop.ts`; `lib/stream-upload.ts`. Tests `test/steam.test.ts`.
+- Restricted/altersbeschränkte Spieldetails liefern 403 (nicht 404). Prisma-Json-Filter `not: undefined` geht nicht → in JS filtern.
+- SDK unter `packages/sdk` (MIT): TS (`src/index.ts` + Tests), Python (`python/gameserver_sdk.py`), C (`c/`, POST immer mit
+  `{}`-JSON-Body, sonst 415). CI baut C (`libcurl4-openssl-dev`) und prüft Python per py_compile.
+- Web: Seiten `pages/{achievements,cards,workshop,family,cloud,stats,bigpicture}`, Admin-Tabs `pages/admin/game/{Features,
+  Achievements,Cards,Codes}Tab.tsx`, `components/BarChart.tsx` (einreihig, Tabellenansicht, Token `--chart-1`),
+  `lib/spatial.ts` (Fokusnavigation + Gamepad), Desktop `OverlayPage`, `ScreenshotsPage`, `IntegrationSettings`,
+  `CloudConflictDialog`. Statistik-Diagramme arbeiten in Stunden mit `minTop=1` (sonst Achse „0 h“ bei kleinen Werten).
+- i18n-Test erkennt auch `t(bedingung ? 'a' : 'b')` (inkl. Vergleichen), Template-Strings bleiben ungeprüft.
+- Prettier ohne Projektkonfiguration NICHT auf Dateien anwenden (formatiert auf doppelte Anführungszeichen um) – und vor
+  `git checkout <datei>` an ungesicherte eigene Änderungen denken (ist passiert).
+- E2E-Testdaten in der Dev-DB: Spiel „E2E Abenteuer“ (Save-Pfad `{install}/saves` *.sav, Workshop-Ordner `mods`,
+  Achievements u. a. ENDING (Datei-Erkennung) und FROM_GAME), Workshop-Inhalt „Testkarte“ abonniert von admin.
 
 ## Konventionen
 

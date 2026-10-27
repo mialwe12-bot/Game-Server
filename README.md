@@ -20,6 +20,7 @@ die Nutzer kostenlos; die Plattform verteilt DRM-freie Spiele, die du selbst hoc
 
 - [Funktionen (Phase 1)](#funktionen-phase-1)
 - [Soziale Funktionen (Phase 3)](#soziale-funktionen-phase-3)
+- [Steam-Funktionen (Phase 4)](#steam-funktionen-phase-4)
 - [Schnellstart mit Docker Compose + Caddy](#schnellstart-mit-docker-compose--caddy)
 - [Erster Admin (Seed-Skript)](#erster-admin-seed-skript)
 - [Konfiguration](#konfiguration)
@@ -156,6 +157,92 @@ die Funktion aus.
 
 ---
 
+## Steam-Funktionen (Phase 4)
+
+Alle Funktionen lassen sich unter **Verwaltung → Einstellungen → Steam-Funktionen** einzeln abschalten
+(Cloud-Saves, Workshop, Sammelkarten, Marktplatz, Geschenke) – ohne echtes Geld, ohne Bezahlfunktionen.
+
+**Cloud-Spielstände**
+- Pro Spiel legt der Admin unter **Spiel bearbeiten → Funktionen** Save-Pfade fest, je Plattform (Windows/Linux/alle) mit
+  Platzhaltern `%APPDATA%`, `%LOCALAPPDATA%`, `%USERPROFILE%`, `%DOCUMENTS%`, `%SAVEDGAMES%`, `$HOME`, `$XDG_DATA_HOME`,
+  `$XDG_CONFIG_HOME`, `{install}`, `{prefix}` sowie Ein-/Ausschlussmustern (`*.sav`, `profiles/**/*.json`, …).
+  Windows-Pfade werden unter Linux automatisch im Wine/Proton-Präfix des Spiels aufgelöst.
+- Der Desktop-Client gleicht **vor dem Start** und **nach dem Beenden** ab (ZIP + Manifest mit SHA-256). Versionen pro Spiel
+  (Anzahl einstellbar), Kontingent pro Nutzer, Wiederherstellen älterer Versionen unter **Cloud-Spielstände**.
+- **Konflikt** = lokal geändert *und* seit dem letzten Abgleich neuere Version auf dem Server → Dialog „Lokal behalten /
+  Cloud-Stand laden“; der verworfene Stand bleibt als ältere Version erhalten.
+
+**Achievements**
+- Admin/Maintainer legen sie pro Spiel an: Icon, Name, Beschreibung, **versteckt**, optional **Fortschritt** (z. B. 0/100),
+  Reihenfolge (Pfeile), manuelle Vergabe/Entzug (Support).
+- Freischaltung über das **SDK** (siehe unten) oder optional per **Erkennungsregel** (Datei existiert, Dateiinhalt bzw.
+  Log-Zeile passt zu Regex) – der Client prüft die Regeln nach dem Spielende.
+- **Seltenheit** in Prozent, Fortschrittsbalken, Toasts/Systembenachrichtigung beim Freischalten, Profil-Vitrine,
+  Abzeichen „Jäger“, Übersicht pro Nutzer (`/u/<name>/achievements`).
+
+**Workshop**
+- Mods/Karten/Sonstiges pro Spiel hochladen (ZIP/7z, Größenlimit einstellbar), **Versionen** mit Änderungsnotizen,
+  Vorschaubild, Tags, **Daumen-Bewertung**, **Kommentare**, **Abonnieren**.
+- Der Client lädt abonnierte Inhalte automatisch nach `<Installation>/<Workshop-Ordner>/<Inhalt>/` (Prüfsumme, atomarer
+  Austausch) – beim Start, vor dem Spielstart, nach einer Installation und sobald der Server ein Update meldet.
+
+**Sammelkarten, Abzeichen, Level, Marktplatz**
+- Admin legt Karten pro Spiel an; Spieler erhalten **Drops nach Spielzeit** (Intervall einstellbar, höchstens ein halbes Set
+  pro Spiel). Ein vollständiges Set wird zu einem **Spiel-Abzeichen** (bis Stufe 5) verarbeitet und bringt **Erfahrung** →
+  **Profil-Level** (auch Achievements geben etwas EP).
+- **Tauschangebote** zwischen Nutzern und ein **Marktplatz** „Karte gegen Karte“ – ausdrücklich ohne Geld.
+
+**Familie, Geschenke, Codes, Kindersicherung**
+- **Familiengruppe** (Erwachsene/Kinder): Mitglieder sehen eingeschränkte Spiele der Familie (**Familienbibliothek**).
+- **Geschenke** an Freunde oder Familienmitglieder (landen nach dem Annehmen in deren Bibliothek), **Aktivierungscodes**
+  pro Spiel (Chargen, Mehrfachnutzung, Ablaufdatum, Sperren, CSV-Export), Einlösen unter **Geschenke & Codes**.
+- **Altersfreigabe** pro Spiel (0/6/12/16/18) und **Kindersicherung** je Kind: höchste Altersstufe (Store, Suche, Bibliothek),
+  **tägliches Spielzeitlimit** (Client warnt 5 Minuten vorher und beendet das Spiel), Chat bzw. Community-Beiträge erlauben.
+
+**Big Picture, Overlay, Screenshots, Remote Play** (Desktop-Client, Details im Client-README)
+- **Big-Picture-Modus** (`/big-picture`): Vollbild-Oberfläche mit räumlicher Fokus-Navigation per **Gamepad API**
+  (Steuerkreuz/Stick, A/B, LB/RB) und Tastatur; Steam Deck im Gaming-Mode startet direkt darin.
+- **Overlay** als eigenständiges Always-on-top-Fenster (Shift+Tab, nur während ein Spiel läuft): Freunde, Chat,
+  Achievements, schwebender Browser, **Notizen pro Spiel** (serverseitig gespeichert), Screenshots.
+- **Screenshots** per globalem Hotkey (F12), Screenshot-Manager, Upload in die Community des Spiels.
+- **Remote Play** über **Sunshine/Moonlight** (Client trägt Spiele in Sunshine ein) und **Remote-Download/-Start** auf
+  anderen eigenen Geräten („Auf anderem Gerät“ auf der Spieleseite, per WebSocket).
+
+**Steam-Integration & Statistiken**
+- Installierte Spiele als **Nicht-Steam-Verknüpfungen** in Steam eintragen (`shortcuts.vdf`, eigene Einträge werden erkannt
+  und aktualisiert, fremde bleiben unangetastet), **Discord Rich Presence** (Anwendungs-ID in den Admin-Einstellungen),
+  **Import vorhandener Spielordner** (Zuordnung per Name, Abgleich mit dem Build-Manifest).
+- **Statistiken**: Spielzeit pro Woche (Diagramm mit Tabellenansicht) und pro Spiel, **Jahresrückblick** (Monate,
+  Top-Spiele, längste Sitzung, Perzentil), **globale Top-Listen** (meistgespielt, meiste Besitzer, bestbewertet,
+  Achievement-Jäger, höchste Level).
+
+### Achievement-SDK
+
+Der Desktop-Client startet jedes Spiel mit drei Umgebungsvariablen:
+
+| Variable | Inhalt |
+| --- | --- |
+| `GS_API_URL` | Adresse des Servers |
+| `GS_GAME_ID` | ID des Spiels |
+| `GS_GAME_TOKEN` | Spielsitzungs-Token `gsg_…` (24 h gültig, nur für dieses Spiel/diesen Nutzer und nur `/api/sdk/*`) |
+
+Kleine Bibliotheken (MIT-lizenziert, damit sie auch in proprietäre Spiele eingebunden werden dürfen) liegen unter
+[`packages/sdk`](packages/sdk): **TypeScript/JavaScript** (`@gameserver/sdk`), **Python** (nur Standardbibliothek) und
+**C** (libcurl; nutzbar aus C/C++, C#, Rust, Godot-GDExtension …). Alle puffern Freischaltungen offline und senden sie später.
+
+```c
+gs_sdk *sdk = gs_sdk_from_env();          /* NULL, wenn nicht über den Client gestartet */
+gs_sdk_unlock(sdk, "FIRST_BLOOD", NULL);
+gs_sdk_set_progress(sdk, "COLLECT_100", 42, NULL);
+gs_sdk_flush(sdk);                        /* offline gepufferte Freischaltungen erneut senden */
+gs_sdk_free(sdk);
+```
+
+HTTP direkt: `POST /api/sdk/achievements/<apiName>/unlock`, `POST /api/sdk/achievements/<apiName>/progress`
+(`{"progress": 42}`), `GET /api/sdk/achievements` – jeweils mit `Authorization: Bearer $GS_GAME_TOKEN`.
+
+---
+
 ## Schnellstart mit Docker Compose + Caddy
 
 Voraussetzungen: Docker mit Compose-Plugin und ein laufender **Caddy** im externen Docker-Netzwerk `reverse-proxy`.
@@ -240,7 +327,8 @@ Alle Optionen stehen kommentiert in [`.env.example`](.env.example). Die wichtigs
 | `WEBRTC_STUN_URLS`, `WEBRTC_TURN_URLS`, `WEBRTC_TURN_SECRET` | STUN/TURN für den Sprachchat (siehe oben) |
 
 Laufzeit-Einstellungen (Registrierungsmodus, Wartungsmodus, Limits, Backup-Zeitplan, öffentlicher Store, Sprachchat, GIFs,
-max. Bildgröße im Chat) werden im
+max. Bildgröße im Chat, Cloud-Saves inkl. Versionen/Kontingent, Workshop inkl. Größenlimit, Sammelkarten/Marktplatz,
+Geschenke, Karten-Drop-Intervall, Discord-Anwendungs-ID) werden im
 Admin-Panel unter **Verwaltung → Einstellungen** gesetzt und in der Datenbank gespeichert.
 
 ---
@@ -416,6 +504,9 @@ Der Tauri-Client (Repository [`game-client`](https://github.com/mialwe12-bot/gam
 - **Downloads** (Warteschlange, Pause/Fortsetzen, Reihenfolge), **Installieren/Spielen/Beenden** auf der Spielseite,
   **Verwalten** (Startoptionen, Proton/Wine-Version, Umgebungsvariablen, Version/Rollback, Reparieren, Verknüpfungen,
   Deinstallation), Bibliotheksansicht **Installiert**, **Client-Einstellungen**, **Offline-Modus**
+- Phase 4: Cloud-Abgleich mit Konfliktdialog, Workshop-Abos, Overlay-Fenster (`#/overlay`), Screenshot-Manager,
+  Big-Picture-Modus, Integrationen (Steam-Verknüpfungen, Sunshine, Discord, Ordner-Import), Kindersicherungs-Timer,
+  Fernbefehle „Installieren/Starten“ von anderen eigenen Geräten
 
 Serverseitig dazu:
 
@@ -439,7 +530,23 @@ Serverseitig dazu:
 - **Vollständige Backups** kopieren alle Spieldateien und benötigen entsprechend Platz und Zeit.
 - **Sprachchat** ist ein WebRTC-Mesh: sinnvoll bis ca. 6 Personen; über das Internet nur mit STUN/TURN (optionaler coturn-Container).
   Für große Sprachkanäle wäre ein SFU (z. B. LiveKit) nötig – bewusst nicht enthalten.
-- **Abzeichen** werden aus Meilensteinen berechnet; Sammelkarten, Level und eigene Abzeichen folgen in Phase 4.
+- **Ingame-Overlay** ist ein eigenes Always-on-top-Fenster, **kein** Grafik-Hook (DirectX/Vulkan/OpenGL). Es erscheint daher
+  nicht über Spielen im exklusiven Vollbild und nicht unter Gamescope (Steam Deck Gaming-Mode); randloses Vollbild bzw.
+  Fenstermodus funktioniert. Ein echter Hook wäre pro Grafik-API nötig und wird von Anti-Cheat-Systemen oft blockiert.
+- **Screenshots per Hotkey** nehmen den Bildschirm über System-APIs auf (X11, Wayland-Portal, Windows); im exklusiven
+  Vollbild kann je nach Treiber ein schwarzes Bild entstehen. Unter Wayland fragt das System ggf. einmalig nach Erlaubnis.
+- **Globale Hotkeys** (Shift+Tab, F12) sind nur aktiv, solange ein Spiel läuft; unter reinem Wayland ohne XWayland-Fokus
+  können Compositoren globale Kürzel verweigern.
+- **Remote Play** streamt nicht selbst, sondern bindet **Sunshine/Moonlight** an (eigenes Streaming mit niedriger Latenz wäre
+  ein eigenes Projekt). Remote-Download/-Start funktioniert nur zu Geräten, die gerade online sind.
+- **Achievement-Erkennung per Datei/Log** ist eine Heuristik; zuverlässig ist nur das SDK.
+- **Cloud-Saves** gelten nur für Spiele mit hinterlegten Save-Pfaden; laufende Spiele werden nicht während des Spielens
+  gesichert, sondern beim Beenden.
+- **Steam-Verknüpfungen**: Steam liest `shortcuts.vdf` nur beim Start und überschreibt die Datei beim Beenden – daher Steam
+  vor dem Abgleich schließen (der Client warnt). Coverbilder für Steam/Sunshine werden nicht gesetzt.
+- **Discord Rich Presence** benötigt eine (kostenlose) Discord-Anwendungs-ID des Betreibers und ein laufendes Discord.
+- **Ordner-Import** gleicht Ordner-Builds dateiweise (Pfad + Größe) ab; bei Archiv-/Installer-Builds nur über den Namen –
+  „Reparieren“ gleicht danach Unterschiede aus.
 - **Bild-Links** aus Chat/Community sind 7 Tage gültig und werden beim Neuladen der Seite automatisch erneuert.
 
 ---
