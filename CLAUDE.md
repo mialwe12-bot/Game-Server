@@ -20,7 +20,9 @@ Download-Manager sind Pflicht.
 ## Stand
 
 - **Phase 1 fertig** (Server, Web-Store, Admin, Docker, Tests, CI, README).
-- Nächster Schritt: **Phase 2 – Desktop-Client** im Repo `game-client`.
+- **Phase 2 fertig** (Desktop-Client im Repo `game-client`, siehe dessen CLAUDE.md; Frontend-Desktop-Modus hier in
+  `apps/web/src/desktop/`, Client-Releases/Updater in `apps/server/src/routes/client.ts`).
+- Nächster Schritt: **Phase 3 – Soziales** (Freunde, Chat, Gruppen, Community, Benachrichtigungen).
 
 ## Architektur & Entscheidungen
 
@@ -70,6 +72,16 @@ pnpm seed --username admin --email a@b.de --password '...' [--demo]
 In der Cloud-Sandbox: `service postgresql start`, User/DB `gs`/`gs`, DBs `gameserver` + `gameserver_test`.
 `prisma migrate reset` ist für KI-Agenten gesperrt → DB stattdessen per `psql` droppen/neu anlegen (nur lokale Test-DBs!).
 Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `pnpm --filter @gameserver/server deploy --prod --legacy <dir>` getestet.
+
+## Phase 2 – Ergänzungen
+- Frontend erkennt Tauri (`isDesktop` in `apps/web/src/desktop/bridge.ts`), lädt Config vor dem Rendern (main.tsx),
+  HashRouter im Desktop, `DesktopProvider` hält installierte Spiele/Downloads/laufende Spiele (Tauri-Ereignisse).
+- `AuthProvider.offline` → `OfflinePage`; 401 im Desktop → Token löschen.
+- Übersetzungen: Test `apps/web/src/i18n/i18n.test.ts` prüft alle statischen `t('…')`-Schlüssel (DE/EN).
+  Achtung beim Einfügen per Skript: Teilstring-Treffer (z. B. `errors:` auch in `auth.errors`) – ist einmal passiert.
+- Server: Modelle `ClientRelease`/`ClientReleaseFile`; Updater bevorzugt NSIS > MSI (Windows), AppImage (Linux).
+- Playtime-Endpunkt akzeptiert `startedAt` mit Offset (`datetime({ offset: true })`).
+- CORS-Standard: `tauri://localhost,http://tauri.localhost,https://tauri.localhost`; CORP global `cross-origin`.
 
 ## Konventionen
 

@@ -123,7 +123,7 @@ export const libraryRoutes: FastifyPluginAsyncZod = async (app) => {
         params: gameParams,
         body: z.object({
           seconds: z.number().int().min(1).max(MAX_SESSION_SECONDS),
-          startedAt: z.string().datetime().optional(),
+          startedAt: z.string().datetime({ offset: true }).optional(),
         }),
       },
     },

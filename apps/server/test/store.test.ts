@@ -114,6 +114,14 @@ describe('Bibliothek', () => {
       payload: { seconds: 3600 },
     });
     expect(res.json().playtimeSeconds).toBe(3600);
+    // Zeitstempel mit Offset und Nanosekunden (wie vom Rust-Client) werden akzeptiert
+    const withOffset = await t.app.inject({
+      method: 'POST',
+      url: `/api/library/${race.gameId}/playtime`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { seconds: 60, startedAt: '2026-10-27T14:49:00.123456789+00:00' },
+    });
+    expect(withOffset.json().playtimeSeconds).toBe(3660);
     expect(
       (await t.app.inject({
         method: 'POST',
@@ -129,6 +137,7 @@ describe('Bibliothek', () => {
     expect(byTitle.map((e: { game: { title: string } }) => e.game.title)).toEqual(['Klötzchen', 'Turbo Racer']);
     const byPlaytime = (await user.req('GET', '/api/library?sort=playtime')).json();
     expect(byPlaytime[0].game.title).toBe('Turbo Racer');
+    expect(byPlaytime[0].playtimeSeconds).toBe(3660);
     expect(byPlaytime[0].lastPlayedAt).not.toBeNull();
     const favs = (await user.req('GET', '/api/library?favorites=true')).json();
     expect(favs.map((e: { game: { title: string } }) => e.game.title)).toEqual(['Klötzchen']);

@@ -9,9 +9,10 @@ die Nutzer kostenlos; die Plattform verteilt DRM-freie Spiele, die du selbst hoc
 | Server (REST + OpenAPI + WebSocket) | Node.js 22, TypeScript, Fastify 5, Prisma 6, PostgreSQL | `apps/server` |
 | Web-Store + Admin-Panel | React 19, Vite, Tailwind CSS 4, TanStack Query, i18next (DE/EN), Dark/Light | `apps/web` |
 | Gemeinsame Typen + API-Client + fortsetzbarer Upload | TypeScript | `packages/shared` |
-| Desktop-Client (Windows/Linux, Tauri) | **Phase 2** – eigenes Repository [`mialwe12-bot/game-client`](https://github.com/mialwe12-bot/game-client) | – |
+| Desktop-Client (Windows/Linux, Tauri 2 + Rust) | eigenes Repository [`mialwe12-bot/game-client`](https://github.com/mialwe12-bot/game-client), nutzt `apps/web` als Submodul | – |
 
-> **Status:** Phase 1 (Server, Web-Store, Admin-Panel) ist fertig. Siehe [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Phase 1 (Server, Web-Store, Admin-Panel) und Phase 2 (Desktop-Client-Kern) sind fertig.
+> Siehe [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -28,6 +29,7 @@ die Nutzer kostenlos; die Plattform verteilt DRM-freie Spiele, die du selbst hoc
 - [Backups & Wiederherstellung](#backups--wiederherstellung)
 - [Sicherheit](#sicherheit)
 - [API](#api)
+- [Desktop-Client](#desktop-client)
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
 - [Lizenz](#lizenz)
 
@@ -252,7 +254,8 @@ pnpm test
   Einstellungen, Speicher, Backups mit `pg_dump`), OpenAPI, Sicherheitsheader und Rate-Limiting.
   Andere Testdatenbank: `DATABASE_URL_TEST=… pnpm test`.
 - `packages/shared`: Upload-Client (Chunks, Wiederholung nach Netzwerkfehler, Pause/Fortsetzen) und Formatierer.
-- Die Tests für den **Download-Manager des Desktop-Clients** folgen mit Phase 2.
+- `apps/web`: Prüfung, dass alle im Code verwendeten Übersetzungsschlüssel auf Deutsch und Englisch existieren.
+- Die Tests für den **Download-Manager** liegen im Client-Repository (`cargo test -p gameserver-core`).
 
 ---
 
@@ -318,6 +321,26 @@ Für große Spielebibliotheken empfiehlt sich zusätzlich ein dateibasiertes Bac
   HTTP-Range, `HEAD`, `ETag`/`If-Range`
 
 Ein typisierter Client steht in `packages/shared` (`ApiClient`, `ResumableUpload`) bereit.
+
+---
+
+## Desktop-Client
+
+Der Tauri-Client (Repository [`game-client`](https://github.com/mialwe12-bot/game-client)) verwendet dasselbe Frontend:
+`apps/web` erkennt die Tauri-WebView und blendet zusätzlich ein:
+
+- **Server-Einrichtung** (Adresse eingeben) und Login per **Device-Token**; SSO/Browser-Login über `/desktop-link`
+  (der Browser übergibt ein neues Device-Token an einen lokalen Loopback-Port des Clients)
+- **Downloads** (Warteschlange, Pause/Fortsetzen, Reihenfolge), **Installieren/Spielen/Beenden** auf der Spielseite,
+  **Verwalten** (Startoptionen, Proton/Wine-Version, Umgebungsvariablen, Version/Rollback, Reparieren, Verknüpfungen,
+  Deinstallation), Bibliotheksansicht **Installiert**, **Client-Einstellungen**, **Offline-Modus**
+
+Serverseitig dazu:
+
+- **Verwaltung → Desktop-Client**: Releases mit Installern und Updater-Signaturen hochladen und veröffentlichen
+- Tauri-Updater-Endpunkt `GET /api/client/update/{target}/{arch}/{currentVersion}` (204 = kein Update)
+- Öffentliche Download-Seite `/client` (Link im Footer)
+- WebSocket-Authentifizierung per Subprotokoll `bearer.<token>`; CORS für die Tauri-Origins ist standardmäßig aktiv
 
 ---
 

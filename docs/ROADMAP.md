@@ -14,7 +14,15 @@ Die Plattform wird strikt phasenweise gebaut. Jede Phase endet mit lauffähigem 
 - Bibliothek im Web: alle Spiele, Sammlungen, Favoriten, Ausblenden, Spielzeit, Sortierung
 - Docker Compose (server, web, postgres) hinter Caddy im Netzwerk `reverse-proxy`, OpenAPI, WebSocket, Tests, CI
 
-## ⏭️ Phase 2 – Desktop-Client (Kern) – Repository `mialwe12-bot/game-client`
+## ✅ Phase 2 – Desktop-Client (Kern) – Repository `mialwe12-bot/game-client` (fertig)
+
+Umgesetzt wie unten geplant. Abweichungen/Details:
+- Delta-Updates **auf Dateiebene** für Ordner-Builds; Archive/Installer werden vollständig geladen.
+- Client-Auto-Update signiert nur mit eigenem Schlüssel (`GS_UPDATER_PUBKEY` beim Bauen), sonst Hinweis + Download.
+- Spielstart über Verknüpfungen: `gameserver-client --launch <gameId>` (Einzelinstanz übernimmt den Start).
+- Echte End-to-End-Prüfung unter Linux (Xvfb): Login, Installation, Start, Spielzeit, Offline-Modus.
+
+Ursprünglicher Plan:
 
 Geplanter Aufbau: **Tauri 2** (Rust-Backend) + dasselbe React-Frontend (`apps/web` als Git-Submodul bzw. Workspace-Abhängigkeit,
 gebaut mit einem „Client-Modus“, der Download-Manager, Installationen und Einstellungen ergänzt). Der API-Client und der
