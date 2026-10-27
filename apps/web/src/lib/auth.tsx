@@ -4,6 +4,8 @@ import { ApiError, type CurrentUser, type MeResponse, type PublicSettings, type 
 import { desktop, isDesktop } from '../desktop/bridge';
 import i18n from '../i18n';
 import { api } from './api';
+import { emitWsEvent } from './events';
+import { handleSocialEvent } from './social';
 import { toast } from './toast';
 
 interface AuthState {
@@ -81,6 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (me.isLoading || offline || (isDesktop && !api.baseUrl)) return;
     return api.connectEvents((e: WsEvent) => {
+      emitWsEvent(e);
+      handleSocialEvent(e, qc);
       switch (e.type) {
         case 'maintenance':
           void qc.invalidateQueries({ queryKey: ['public-settings'] });

@@ -113,6 +113,23 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <Card title={t('admin.settingsPage.social')}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Toggle checked={s.voiceEnabled} onChange={(v) => setS({ ...s, voiceEnabled: v })} label={t('admin.settingsPage.voiceEnabled')} />
+          <Toggle checked={s.gifsEnabled} onChange={(v) => setS({ ...s, gifsEnabled: v })} label={t('admin.settingsPage.gifsEnabled')} />
+          <Field label={t('admin.settingsPage.maxChatImageMb')}>
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              value={Math.round(s.maxChatImageBytes / 1024 ** 2)}
+              onChange={(e) => setS({ ...s, maxChatImageBytes: Math.max(1, num(e.target.value)) * 1024 ** 2 })}
+            />
+          </Field>
+        </div>
+        <p className="mt-3 text-xs text-muted">{t('admin.settingsPage.socialHint')}</p>
+      </Card>
+
       <Card title={t('admin.settingsPage.mail')}>
         <Button onClick={() => testMail.mutate()} loading={testMail.isPending} disabled={!pub?.smtpEnabled}>
           {t('admin.settingsPage.testMail')}

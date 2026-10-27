@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useNavigate } from 'react-router-dom';
 import { DESKTOP_EVENTS, type DesktopConfig, type DownloadJob, type InstalledGame, type PlatformInfo, type RunningGame } from '@gameserver/shared';
 import { api } from '../lib/api';
+import { useWsEvent } from '../lib/events';
 import { toast } from '../lib/toast';
 import { desktop, desktopError, isDesktop } from './bridge';
 
@@ -47,6 +48,16 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
     setRunning(new Set(run.map((r) => r.gameId)));
     setPlatform(plat);
   }, []);
+
+  // „Spielt gerade“ an den Server melden (Präsenz für Freunde); nach WebSocket-Neuverbindung erneut senden.
+  const presenceGame = running.size ? [...running][0] : null;
+  const reportPresence = useCallback(() => {
+    if (api.token) void api.friends.setPresence(presenceGame).catch(() => undefined);
+  }, [presenceGame]);
+  useEffect(reportPresence, [reportPresence]);
+  useWsEvent((e) => {
+    if (e.type === 'hello' && presenceGame) reportPresence();
+  });
 
   useEffect(() => {
     void reload();

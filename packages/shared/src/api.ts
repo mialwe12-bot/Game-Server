@@ -39,8 +39,39 @@ import type {
   UploadDto,
   UserPublic,
   VersionDto,
+  WsClientMessage,
   WsEvent,
 } from './types.js';
+import type {
+  ActivityDto,
+  ChatConfig,
+  CommunityItemDto,
+  CommunityItemType,
+  ConversationDto,
+  ForumPostDto,
+  ForumTopicDto,
+  FriendsOverview,
+  GifResult,
+  GroupAnnouncementDto,
+  GroupDetail,
+  GroupEventDto,
+  GroupJoinPolicy,
+  GroupMemberDto,
+  GroupRole,
+  GroupSummary,
+  GroupVisibility,
+  MessageDto,
+  NotificationDto,
+  NotificationPrefs,
+  ProfileDto,
+  ProfileSettings,
+  ProfileVisibility,
+  ReviewDto,
+  ReviewSummary,
+  RsvpStatus,
+  ShowcaseConfig,
+  UserSearchResult,
+} from './social.js';
 
 export class ApiError extends Error {
   constructor(
@@ -160,6 +191,22 @@ export interface AdminUploadDto {
   game: { id: string; title: string };
   version: string;
   platform: Platform;
+}
+
+export interface GroupInput {
+  name?: string;
+  summary?: string;
+  description?: string;
+  joinPolicy?: GroupJoinPolicy;
+  visibility?: GroupVisibility;
+}
+
+export interface GroupEventInput {
+  title: string;
+  description?: string;
+  startsAt: string;
+  endsAt?: string | null;
+  gameId?: string | null;
 }
 
 /** Typisierter Client für die REST-API. */
@@ -436,6 +483,145 @@ export class ApiClient {
     deleteFile: (fileId: string) => this.del<{ ok: true }>(`/admin/client-files/${fileId}`),
   };
 
+  // ---- Phase 3: Soziales ----
+  friends = {
+    overview: () => this.get<FriendsOverview>('/friends'),
+    search: (q: string) => this.get<UserSearchResult[]>('/users/search', { q }),
+    request: (username: string) => this.post<{ status: 'outgoing' | 'friends' }>('/friends/requests', { username }),
+    accept: (requestId: string) => this.post<{ ok: true }>(`/friends/requests/${requestId}/accept`),
+    decline: (requestId: string) => this.del<{ ok: true }>(`/friends/requests/${requestId}`),
+    remove: (userId: string) => this.del<{ ok: true }>(`/friends/${userId}`),
+    block: (userId: string) => this.post<{ ok: true }>(`/blocks/${userId}`),
+    unblock: (userId: string) => this.del<{ ok: true }>(`/blocks/${userId}`),
+    invite: (userId: string, gameId: string) => this.post<{ ok: true }>(`/friends/${userId}/invite`, { gameId }),
+    setPresence: (gameId: string | null) => this.put<{ ok: true }>('/presence', { gameId }),
+  };
+
+  profiles = {
+    get: (username: string) => this.get<ProfileDto>(`/profiles/${encodeURIComponent(username)}`),
+    settings: () => this.get<ProfileSettings>('/me/profile'),
+    updateSettings: (data: {
+      accent?: string | null;
+      visibility?: ProfileVisibility;
+      allowFriendRequests?: boolean;
+      showcases?: ShowcaseConfig[];
+      notificationPrefs?: { email: Partial<NotificationPrefs['email']> };
+    }) => this.patch<ProfileSettings>('/me/profile', data),
+    uploadBackground: (file: Blob) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<ProfileSettings>('POST', '/me/profile/background', { body: fd });
+    },
+    deleteBackground: () => this.del<ProfileSettings>('/me/profile/background'),
+  };
+
+  notifications = {
+    list: (before?: string) => this.get<{ items: NotificationDto[]; unread: number }>('/notifications', { before }),
+    markRead: (ids?: string[]) => this.post<{ ok: true }>('/notifications/read', { ids }),
+    remove: (id: string) => this.del<{ ok: true }>(`/notifications/${id}`),
+    clearRead: () => this.del<{ ok: true }>('/notifications'),
+    feed: (before?: string) => this.get<ActivityDto[]>('/feed', { before }),
+  };
+
+  chat = {
+    config: () => this.get<ChatConfig>('/chat/config'),
+    conversations: () => this.get<ConversationDto[]>('/chat/conversations'),
+    conversation: (id: string) => this.get<ConversationDto>(`/chat/conversations/${id}`),
+    unread: () => this.get<{ count: number }>('/chat/unread'),
+    direct: (userId: string) => this.post<ConversationDto>('/chat/direct', { userId }),
+    createGroup: (userIds: string[], title?: string) => this.post<ConversationDto>('/chat/conversations', { userIds, title }),
+    update: (id: string, data: { title?: string | null; muted?: boolean }) => this.patch<ConversationDto>(`/chat/conversations/${id}`, data),
+    addMembers: (id: string, userIds: string[]) => this.post<ConversationDto>(`/chat/conversations/${id}/members`, { userIds }),
+    removeMember: (id: string, userId: string) => this.del<{ ok: true }>(`/chat/conversations/${id}/members/${userId}`),
+    messages: (id: string, before?: string) => this.get<MessageDto[]>(`/chat/conversations/${id}/messages`, { before }),
+    send: (id: string, body: string, gifUrl?: string) => this.post<MessageDto>(`/chat/conversations/${id}/messages`, { body, gifUrl }),
+    sendImage: (id: string, file: Blob, caption?: string) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<MessageDto>('POST', `/chat/conversations/${id}/attachments`, { body: fd, query: { caption } });
+    },
+    edit: (messageId: string, body: string) => this.patch<MessageDto>(`/chat/messages/${messageId}`, { body }),
+    remove: (messageId: string) => this.del<{ ok: true }>(`/chat/messages/${messageId}`),
+    read: (id: string) => this.post<{ ok: true }>(`/chat/conversations/${id}/read`),
+    gifs: (q: string) => this.get<GifResult[]>('/chat/gifs', { q }),
+  };
+
+  groups = {
+    list: (q: { q?: string; mine?: boolean } = {}) => this.get<GroupSummary[]>('/groups', q as Query),
+    create: (data: GroupInput & { name: string }) => this.post<GroupDetail>('/groups', data),
+    get: (idOrSlug: string) => this.get<GroupDetail>(`/groups/${encodeURIComponent(idOrSlug)}`),
+    update: (id: string, data: GroupInput) => this.patch<GroupDetail>(`/groups/${id}`, data),
+    remove: (id: string) => this.del<{ ok: true }>(`/groups/${id}`),
+    uploadImage: (id: string, kind: 'avatar' | 'banner', file: Blob) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<GroupDetail>('POST', `/groups/${id}/${kind}`, { body: fd });
+    },
+    join: (id: string) => this.post<GroupDetail>(`/groups/${id}/join`),
+    leave: (id: string) => this.post<{ ok: true }>(`/groups/${id}/leave`),
+    members: (id: string) => this.get<GroupMemberDto[]>(`/groups/${id}/members`),
+    invite: (id: string, userId: string) => this.post<{ ok: true }>(`/groups/${id}/invites`, { userId }),
+    approve: (id: string, userId: string) => this.post<{ ok: true }>(`/groups/${id}/members/${userId}/approve`),
+    removeMember: (id: string, userId: string) => this.del<{ ok: true }>(`/groups/${id}/members/${userId}`),
+    setRole: (id: string, userId: string, role: GroupRole) => this.patch<{ ok: true }>(`/groups/${id}/members/${userId}`, { role }),
+    announcements: (id: string) => this.get<GroupAnnouncementDto[]>(`/groups/${id}/announcements`),
+    announce: (id: string, title: string, body: string) => this.post<GroupAnnouncementDto>(`/groups/${id}/announcements`, { title, body }),
+    deleteAnnouncement: (id: string, aid: string) => this.del<{ ok: true }>(`/groups/${id}/announcements/${aid}`),
+    events: (id: string, past = false) => this.get<GroupEventDto[]>(`/groups/${id}/events`, { past: past || undefined }),
+    createEvent: (id: string, data: GroupEventInput) => this.post<GroupEventDto>(`/groups/${id}/events`, data),
+    updateEvent: (id: string, eventId: string, data: Partial<GroupEventInput>) => this.patch<GroupEventDto>(`/groups/${id}/events/${eventId}`, data),
+    deleteEvent: (id: string, eventId: string) => this.del<{ ok: true }>(`/groups/${id}/events/${eventId}`),
+    rsvp: (eventId: string, status: RsvpStatus | null) => this.put<GroupEventDto>(`/groups/events/${eventId}/rsvp`, { status }),
+    createChannel: (id: string, title: string) => this.post<{ id: string; title: string }>(`/groups/${id}/channels`, { title }),
+    deleteChannel: (id: string, channelId: string) => this.del<{ ok: true }>(`/groups/${id}/channels/${channelId}`),
+  };
+
+  community = {
+    reviews: (gameId: string, q: { sort?: 'helpful' | 'recent'; filter?: 'all' | 'positive' | 'negative'; page?: number; pageSize?: number } = {}) =>
+      this.get<{ summary: ReviewSummary; items: ReviewDto[]; total: number; mine: ReviewDto | null }>(`/community/games/${gameId}/reviews`, q as Query),
+    reviewSummary: (gameId: string) => this.get<ReviewSummary>(`/community/games/${gameId}/reviews/summary`),
+    saveReview: (gameId: string, recommended: boolean, body: string) => this.put<ReviewDto>(`/community/games/${gameId}/reviews/mine`, { recommended, body }),
+    deleteMyReview: (gameId: string) => this.del<{ ok: true }>(`/community/games/${gameId}/reviews/mine`),
+    deleteReview: (id: string) => this.del<{ ok: true }>(`/community/reviews/${id}`),
+    vote: (id: string, helpful: boolean | null, funny = false) => this.put<ReviewDto>(`/community/reviews/${id}/vote`, { helpful, funny }),
+    topics: (gameId: string, q: { q?: string; page?: number; pageSize?: number } = {}) =>
+      this.get<{ items: ForumTopicDto[]; total: number }>(`/community/games/${gameId}/topics`, q as Query),
+    createTopic: (gameId: string, title: string, body: string) => this.post<ForumTopicDto>(`/community/games/${gameId}/topics`, { title, body }),
+    topic: (id: string, page = 1) =>
+      this.get<{ topic: ForumTopicDto; game: { id: string; slug: string; title: string }; posts: ForumPostDto[]; total: number; canModerate: boolean }>(
+        `/community/topics/${id}`,
+        { page },
+      ),
+    reply: (topicId: string, body: string) => this.post<ForumPostDto>(`/community/topics/${topicId}/posts`, { body }),
+    updateTopic: (id: string, data: { title?: string; pinned?: boolean; locked?: boolean }) => this.patch<ForumTopicDto>(`/community/topics/${id}`, data),
+    deleteTopic: (id: string) => this.del<{ ok: true }>(`/community/topics/${id}`),
+    editPost: (id: string, body: string) => this.patch<ForumPostDto>(`/community/posts/${id}`, { body }),
+    deletePost: (id: string) => this.del<{ ok: true }>(`/community/posts/${id}`),
+    items: (gameId: string, q: { type?: CommunityItemType; sort?: 'recent' | 'popular'; page?: number; pageSize?: number } = {}) =>
+      this.get<{ items: CommunityItemDto[]; total: number }>(`/community/games/${gameId}/items`, q as Query),
+    uploadImage: (gameId: string, file: Blob, data: { type: 'SCREENSHOT' | 'ARTWORK'; title?: string; body?: string }) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<CommunityItemDto>('POST', `/community/games/${gameId}/items/image`, { body: fd, query: data });
+    },
+    createGuide: (gameId: string, title: string, body: string) => this.post<CommunityItemDto>(`/community/games/${gameId}/guides`, { title, body }),
+    item: (id: string) => this.get<CommunityItemDto & { canEdit: boolean }>(`/community/items/${id}`),
+    updateItem: (id: string, data: { title?: string; body?: string }) => this.patch<CommunityItemDto>(`/community/items/${id}`, data),
+    deleteItem: (id: string) => this.del<{ ok: true }>(`/community/items/${id}`),
+    like: (id: string) => this.put<{ likes: number; liked: boolean }>(`/community/items/${id}/like`),
+    unlike: (id: string) => this.del<{ likes: number; liked: boolean }>(`/community/items/${id}/like`),
+    news: (gameId: string) => this.get<AnnouncementDto[]>(`/community/games/${gameId}/news`),
+  };
+
+  private socket: WebSocket | null = null;
+
+  /** Nachricht über den bestehenden WebSocket senden (Tipp-Hinweise, Sprachchat-Signalisierung). */
+  wsSend(msg: WsClientMessage): boolean {
+    if (this.socket?.readyState !== 1) return false;
+    this.socket.send(JSON.stringify(msg));
+    return true;
+  }
+
   /**
    * WebSocket-Verbindung. Browser: Cookie-Auth; Desktop-Client: Device-Token als Subprotokoll "bearer.<token>".
    * Verbindet bei Abbruch automatisch neu.
@@ -450,6 +636,7 @@ export class ApiClient {
     const connect = () => {
       if (closed) return;
       ws = this.token ? new WebSocket(wsUrl, ['gs.v1', `bearer.${this.token}`]) : new WebSocket(wsUrl);
+      this.socket = ws;
       ws.onopen = () => {
         retry = 1000;
         ping = setInterval(() => ws?.readyState === 1 && ws.send(JSON.stringify({ type: 'ping' })), 30_000);
@@ -470,6 +657,7 @@ export class ApiClient {
     return () => {
       closed = true;
       clearInterval(ping);
+      if (this.socket === ws) this.socket = null;
       ws?.close();
     };
   }

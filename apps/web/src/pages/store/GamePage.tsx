@@ -9,6 +9,7 @@ import { GameCard, GameCover } from '../../components/GameCard';
 import { Markdown } from '../../components/Markdown';
 import { PlatformIcon } from '../../components/PlatformIcons';
 import { Badge, Button, Card, ErrorState, PageLoader, Tabs } from '../../components/ui';
+import { GameCommunity, GameTabs, type GameTab } from '../community/GameCommunity';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDate, formatPlaytime } from '../../lib/format';
@@ -202,7 +203,8 @@ function Requirements({ game }: { game: GameDetail }) {
 }
 
 export default function GamePage() {
-  const { slug = '' } = useParams();
+  const { slug = '', tab: tabParam, topicId } = useParams();
+  const tab = topicId ? 'forum' : (tabParam ?? 'store');
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -264,7 +266,12 @@ export default function GamePage() {
           </Link>
         )}
       </div>
+      <GameTabs game={g} tab={tab as GameTab} />
 
+      {tab !== 'store' ? (
+        <GameCommunity game={g} tab={tab as GameTab} topicId={topicId} />
+      ) : (
+      <>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <MediaGallery game={g} />
         <aside className="space-y-4">
@@ -417,6 +424,8 @@ export default function GamePage() {
           )}
         </aside>
       </div>
+      </>
+      )}
     </div>
   );
 }

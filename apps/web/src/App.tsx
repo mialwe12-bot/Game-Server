@@ -11,7 +11,6 @@ import ServerSetupPage from './desktop/ServerSetupPage';
 import { api } from './lib/api';
 import { useAuth } from './lib/auth';
 import AccountPage from './pages/account/AccountPage';
-import ProfilePage from './pages/account/ProfilePage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -25,9 +24,20 @@ import GamePage from './pages/store/GamePage';
 import HomePage from './pages/store/HomePage';
 import SearchPage from './pages/store/SearchPage';
 import WishlistPage from './pages/store/WishlistPage';
+import ItemPage from './pages/community/ItemPage';
+import FeedPage from './pages/social/FeedPage';
+import FriendsPage from './pages/social/FriendsPage';
+import NotificationsPage from './pages/social/NotificationsPage';
+import ProfilePage from './pages/social/ProfilePage';
 
 // Admin-Bereich separat laden
 const AdminRoutes = lazy(() => import('./pages/admin/AdminRoutes'));
+// Soziale Bereiche mit größeren Abhängigkeiten ebenfalls nachladen
+const ChatPage = lazy(() => import('./pages/chat/ChatPage'));
+const GroupPage = lazy(() => import('./pages/groups/GroupPage'));
+const GroupsPage = lazy(() => import('./pages/groups/GroupsPage'));
+
+const lazyPage = (el: React.ReactNode) => <Suspense fallback={<PageLoader />}>{el}</Suspense>;
 
 export default function App() {
   const { settings, user, loading, offline } = useAuth();
@@ -53,6 +63,16 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/game/:slug" element={<GamePage />} />
+            <Route path="/game/:slug/forum/:topicId" element={<GamePage />} />
+            <Route path="/game/:slug/:tab" element={<GamePage />} />
+            <Route path="/community/items/:id" element={<ItemPage />} />
+            <Route path="/groups" element={<RequireAuth>{lazyPage(<GroupsPage />)}</RequireAuth>} />
+            <Route path="/groups/:slug" element={lazyPage(<GroupPage />)} />
+            <Route path="/friends" element={<RequireAuth><FriendsPage /></RequireAuth>} />
+            <Route path="/chat" element={<RequireAuth>{lazyPage(<ChatPage />)}</RequireAuth>} />
+            <Route path="/chat/:id" element={<RequireAuth>{lazyPage(<ChatPage />)}</RequireAuth>} />
+            <Route path="/activity" element={<RequireAuth><FeedPage /></RequireAuth>} />
+            <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
             <Route path="/u/:username" element={<ProfilePage />} />
             <Route path="/client" element={<ClientDownloadPage />} />
             <Route path="/desktop-link" element={<RequireAuth><DesktopLinkPage /></RequireAuth>} />

@@ -61,6 +61,7 @@ export const desktop = {
 
   checkClientUpdate: () => invoke<ClientUpdateInfo>('check_client_update'),
   installClientUpdate: () => invoke<void>('install_client_update'),
+  showNotification: (title: string, body: string) => invoke<void>('show_notification', { title, body }),
 
   on: <T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> => listen<T>(event, (e) => cb(e.payload)),
 };

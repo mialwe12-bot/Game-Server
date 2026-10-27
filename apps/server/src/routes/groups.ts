@@ -175,7 +175,7 @@ export const groupRoutes: FastifyPluginAsyncZod = async (app) => {
     } else if (g.joinPolicy === 'REQUEST') {
       if (!g.me) {
         await db.groupMember.create({ data: { groupId: g.id, userId: user.id, status: 'PENDING' } });
-        await notifyModerators(g.id, 'group.request', { username: user.displayName ?? user.username, groupName: g.name, path: `/groups/${g.slug}/members` });
+        await notifyModerators(g.id, 'group.request', { username: user.displayName ?? user.username, groupName: g.name, path: `/groups/${g.slug}` });
       }
     } else {
       throw forbidden('Beitritt nur auf Einladung', 'invite_only');

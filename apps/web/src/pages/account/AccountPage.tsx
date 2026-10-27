@@ -11,6 +11,7 @@ import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDateTime } from '../../lib/format';
 import { toast } from '../../lib/toast';
+import { SocialSettings } from './SocialSettings';
 
 function ProfileSection() {
   const { t, i18n } = useTranslation();
@@ -405,6 +406,7 @@ export default function AccountPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <h1 className="text-2xl font-bold">{t('account.title')}</h1>
       <ProfileSection />
+      <SocialSettings />
       <h2 className="pt-2 text-xl font-semibold">{t('account.security')}</h2>
       <PasswordSection />
       <TwoFactorSection />

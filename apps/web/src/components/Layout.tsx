@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, X, XCircle } from 'lucide-react';
+import { Activity, CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, Users, UsersRound, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { useTheme, type ThemeMode } from '../lib/theme';
 import { dismiss, useToasts } from '../lib/toast';
 import { Avatar } from './Avatar';
 import { Markdown } from './Markdown';
+import { ChatNavButton, NotificationBell } from './Social';
 
 function NavItem({ to, children, icon }: { to: string; children: ReactNode; icon: ReactNode }) {
   return (
@@ -19,7 +20,7 @@ function NavItem({ to, children, icon }: { to: string; children: ReactNode; icon
       end={to === '/'}
       className={({ isActive }) =>
         clsx(
-          'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold uppercase tracking-wide transition',
+          'flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-semibold uppercase tracking-wide transition',
           isActive ? 'text-accent' : 'text-muted hover:text-fg',
         )
       }
@@ -177,7 +178,7 @@ function HeaderSearch() {
   const [q, setQ] = useState('');
   return (
     <form
-      className="relative hidden md:block"
+      className="relative hidden md:block xl:hidden 2xl:block"
       onSubmit={(e) => {
         e.preventDefault();
         navigate(`/search?q=${encodeURIComponent(q)}`);
@@ -251,6 +252,15 @@ export function Layout() {
           <NavItem to="/wishlist" icon={<Star className="size-4" />}>
             {t('nav.wishlist')}
           </NavItem>
+          <NavItem to="/friends" icon={<Users className="size-4" />}>
+            {t('nav.friends')}
+          </NavItem>
+          <NavItem to="/groups" icon={<UsersRound className="size-4" />}>
+            {t('nav.groups')}
+          </NavItem>
+          <NavItem to="/activity" icon={<Activity className="size-4" />}>
+            {t('nav.activity')}
+          </NavItem>
           {desk && (
             <NavItem to="/downloads" icon={<Download className="size-4" />}>
               {t('nav.downloads')}
@@ -271,16 +281,22 @@ export function Layout() {
       )}
       <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
-          <button type="button" className="rounded p-1 md:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label={t('nav.menu')}>
+          <button type="button" className="rounded p-1 xl:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label={t('nav.menu')}>
             {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
           </button>
           <Link to="/" className="flex items-center gap-2 font-bold tracking-wide">
             <img src="/favicon.svg" alt="" className="size-7" />
-            <span className="hidden sm:inline">{settings?.siteName ?? 'Game Server'}</span>
+            <span className="hidden whitespace-nowrap sm:inline">{settings?.siteName ?? 'Game Server'}</span>
           </Link>
-          <nav className="hidden items-center gap-1 md:flex">{nav}</nav>
+          <nav className="hidden items-center gap-1 xl:flex">{nav}</nav>
           <div className="ml-auto flex items-center gap-2">
             <HeaderSearch />
+            {user && (
+              <>
+                <ChatNavButton />
+                <NotificationBell />
+              </>
+            )}
             {!user && (
               <Link to="/login" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:brightness-110">
                 {t('nav.login')}
@@ -289,7 +305,7 @@ export function Layout() {
             <UserMenu />
           </div>
         </div>
-        {mobileOpen && <nav className="flex flex-col gap-1 border-t border-border px-4 py-2 md:hidden">{nav}</nav>}
+        {mobileOpen && <nav className="flex flex-col gap-1 border-t border-border px-4 py-2 xl:hidden">{nav}</nav>}
       </header>
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
         <Outlet />
