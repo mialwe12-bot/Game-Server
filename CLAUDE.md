@@ -151,6 +151,14 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
   (Zuordnung per Name + Abgleich mit Build-Manifest).
 - Statistiken: aus PlaySession – pro Woche/Spiel, Jahresrückblick, globale Top-Listen.
 
+## Installation (Server)
+- `deploy/install.sh`: interaktiv oder per Env (`GS_MODE=own|existing|local`, `GS_DOMAIN`, `GS_ACME_EMAIL`, `GS_DATA_PATH`,
+  `GS_ADMIN_*`, `--yes`), Ziel `/opt/gameserver`, Branch über `GS_BRANCH`. Modus own/local erzeugt `caddy/Caddyfile` +
+  `caddy/docker-compose.yml` (Container `gameserver-caddy` im Netz `reverse-proxy`), merkt sich Modus in `.install-mode`.
+  Admin per `docker compose exec -e ADMIN_* server node dist/seed.js`. Erneuter Lauf = Update (git ff-only, rebuild).
+  In der Sandbox nur Teilfunktionen getestet (kein Docker); shellcheck sauber.
+- Desktop-Installer 0.4.0 (deb, AppImage, Windows-NSIS) wurden gebaut und dem Nutzer direkt übergeben (nicht im Repo).
+
 ## Phase 4 – Umsetzung (Ergänzungen)
 - Server: Migration `steam_features`; Routen `cloud.ts`, `achievements.ts`, `sdk.ts` (playRoutes `/play/:gameId/start`,
   `/me/parental` + sdkRoutes `/sdk/*`), `workshop.ts`, `cards.ts`, `family.ts`, `gifts.ts` (+ `/codes/*`), `stats.ts`,

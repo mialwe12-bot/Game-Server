@@ -245,6 +245,21 @@ HTTP direkt: `POST /api/sdk/achievements/<apiName>/unlock`, `POST /api/sdk/achie
 
 ## Schnellstart mit Docker Compose + Caddy
 
+### Am einfachsten: Installationsskript
+
+Auf einem Linux-Server (Debian/Ubuntu u. a.) als root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mialwe12-bot/Game-Server/claude/magical-archimedes-jb34jz/deploy/install.sh -o install.sh
+sudo bash install.sh
+```
+
+Das Skript ([`deploy/install.sh`](deploy/install.sh)) installiert bei Bedarf Docker, lädt den Code nach `/opt/gameserver`,
+erzeugt die `.env` mit zufälligen Passwörtern, richtet den Zugang ein (eigener Caddy mit automatischem HTTPS, vorhandener
+Caddy oder HTTP auf Port 8080 zum Testen), startet alles und legt das erste Admin-Konto an. Erneut ausführen = Update.
+
+### Manuell
+
 Voraussetzungen: Docker mit Compose-Plugin und ein laufender **Caddy** im externen Docker-Netzwerk `reverse-proxy`.
 
 ```bash
