@@ -672,6 +672,8 @@ model Message {
   attachmentKey  String?
   attachmentMime String?
   gifUrl         String?
+  // Föderation Stufe 3: Herkunfts-ID einer über einen anderen Server zugestellten Nachricht (Dedup).
+  federationId   String?      @unique
   createdAt      DateTime     @default(now())
   editedAt       DateTime?
   deletedAt      DateTime?

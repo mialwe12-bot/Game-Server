@@ -13,6 +13,7 @@ import type {
 import type { AppContext } from '../context.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { iso } from '../lib/time.js';
+import { messageDto } from './social-dto.js';
 
 const CLOCK_SKEW_MS = 5 * 60_000;
 const PAIRING_TTL_MS = 15 * 60_000;
@@ -99,18 +100,25 @@ export class FederationService {
     }
   }
 
-  /** Signierte Anfrage an einen Peer (Body wird bewusst nicht signiert – alle Parameter stehen im Pfad). */
-  private async signedFetch(baseUrl: string, method: string, apiPath: string, timeoutMs = 20_000): Promise<Response> {
+  /**
+   * Signierte Anfrage an einen Peer. Signiert werden Methode, Pfad und Zeitstempel (nicht der Body).
+   * Chat-Zustellung (Stufe 3) überträgt einen JSON-Body; dessen Integrität ruht auf TLS + vertrauenswürdigem
+   * Peer + Dedup per federationId (Replay innerhalb des Zeitfensters erzeugt keine Doppelnachricht).
+   */
+  private async signedFetch(baseUrl: string, method: string, apiPath: string, body?: unknown, timeoutMs = 20_000): Promise<Response> {
     const ts = Date.now();
     const sig = await this.signString(this.canonical(method, apiPath, ts));
+    const headers: Record<string, string> = {
+      'X-GS-Server': this.baseUrl(),
+      'X-GS-Timestamp': String(ts),
+      'X-GS-Signature': sig,
+      Accept: 'application/json',
+    };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
     return fetch(`${baseUrl}${apiPath}`, {
       method,
-      headers: {
-        'X-GS-Server': this.baseUrl(),
-        'X-GS-Timestamp': String(ts),
-        'X-GS-Signature': sig,
-        Accept: 'application/json',
-      },
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(timeoutMs),
     });
   }
@@ -452,6 +460,79 @@ export class FederationService {
     return this.ctx.db.user.create({
       data: { username, email, displayName, role: 'USER', federationServerId: serverId, federationUserId: identity.userId },
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stufe 3: föderierter Chat (Direktnachrichten über Servergrenzen)
+  // ---------------------------------------------------------------------------
+
+  /** Heimat-Server: Identität eines lokalen (echten) Nutzers per Username (für Netzwerk-DMs). */
+  async localUserIdentity(username: string): Promise<FederatedIdentity | null> {
+    const user = await this.ctx.db.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' }, federationServerId: null, disabled: false },
+    });
+    return user ? this.buildIdentity(user) : null;
+  }
+
+  /** Besuchender Server: Remote-Nutzer suchen und lokales Schatten-Konto anlegen (um eine DM zu starten). */
+  async lookupRemoteUser(serverId: string, username: string): Promise<User> {
+    const peer = await this.ctx.db.federatedServer.findUnique({ where: { id: serverId } });
+    if (!peer || peer.status !== 'ACTIVE') throw notFound('Server nicht verbunden');
+    const res = await this.signedFetch(peer.baseUrl, 'GET', `/api/federation/users/${encodeURIComponent(username)}`);
+    if (res.status === 404) throw notFound('Nutzer nicht gefunden');
+    if (!res.ok) throw badRequest(`Suche fehlgeschlagen (HTTP ${res.status})`, 'federation_lookup_failed');
+    return this.provisionFederatedUser(peer.id, (await res.json()) as FederatedIdentity);
+  }
+
+  /** Leitet eine in einer Direkt-Konversation gepostete Nachricht an den Heimat-Server des Remote-Partners weiter. */
+  async forwardChatMessage(author: User, shadowOther: User, msg: { id: string; body: string; gifUrl: string | null; createdAt: Date }): Promise<void> {
+    if (!shadowOther.federationServerId || !shadowOther.federationUserId) return;
+    const peer = await this.ctx.db.federatedServer.findUnique({ where: { id: shadowOther.federationServerId } });
+    if (!peer || peer.status !== 'ACTIVE') return;
+    const body = {
+      federationId: msg.id,
+      from: { userId: author.id, username: author.username, displayName: author.displayName ?? author.username },
+      toUserId: shadowOther.federationUserId,
+      body: msg.body,
+      gifUrl: msg.gifUrl,
+      sentAt: msg.createdAt.toISOString(),
+    };
+    try {
+      await this.signedFetch(peer.baseUrl, 'POST', '/api/federation/chat/deliver', body);
+    } catch (err) {
+      this.ctx.logs.push({ time: new Date().toISOString(), level: 'warn', msg: `Föderierte Chat-Zustellung fehlgeschlagen: ${String(err)}` });
+    }
+  }
+
+  /** Empfängt eine föderierte Chat-Nachricht von einem Peer und legt sie lokal an (mit Dedup). */
+  async deliverIncomingChat(
+    peer: FederatedServer,
+    payload: { federationId: string; from: { userId: string; username: string; displayName: string | null }; toUserId: string; body: string; gifUrl: string | null; sentAt: string },
+  ): Promise<{ ok: true; duplicate?: boolean }> {
+    const { db } = this.ctx;
+    if (await db.message.findUnique({ where: { federationId: payload.federationId } })) return { ok: true, duplicate: true };
+    const local = await db.user.findFirst({ where: { id: payload.toUserId, federationServerId: null } });
+    if (!local || local.disabled) throw notFound('Empfänger nicht gefunden');
+    const sender = await this.provisionFederatedUser(peer.id, { userId: payload.from.userId, username: payload.from.username, displayName: payload.from.displayName, avatarUrl: null });
+    const blocked = await db.block.findFirst({ where: { OR: [{ blockerId: local.id, blockedId: sender.id }, { blockerId: sender.id, blockedId: local.id }] } });
+    if (blocked) return { ok: true };
+    const conv = await this.ctx.chat.ensureDirect(local.id, sender.id, sender.id);
+    const createdAt = Number.isFinite(Date.parse(payload.sentAt)) ? new Date(payload.sentAt) : new Date();
+    const msg = await db.message.create({
+      data: { conversationId: conv.id, authorId: sender.id, body: payload.body, gifUrl: payload.gifUrl, federationId: payload.federationId, createdAt },
+      include: { author: true },
+    });
+    await db.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: msg.createdAt } });
+    const dto = messageDto(this.ctx.signer, msg);
+    this.ctx.hub.toUsers([local.id, sender.id], { type: 'chat.message', data: dto });
+    const preview = payload.body ? payload.body.slice(0, 200) : payload.gifUrl ? 'GIF' : '📷';
+    await this.ctx.notifications.notify(
+      local.id,
+      'message',
+      { username: sender.displayName ?? sender.username, conversationId: conv.id, preview, path: `/chat/${conv.id}` },
+      { store: false },
+    );
+    return { ok: true };
   }
 
   // ---------------------------------------------------------------------------

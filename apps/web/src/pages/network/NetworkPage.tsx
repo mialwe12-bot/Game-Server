@@ -1,12 +1,54 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Download, Network, Server } from 'lucide-react';
+import { Download, MessageSquare, Network, Server } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import type { NetworkGameDto, RemoteBuildDto } from '@gameserver/shared';
 import { PlatformIcon } from '../../components/PlatformIcons';
-import { Badge, Button, Card, EmptyState, PageLoader } from '../../components/ui';
+import { Badge, Button, Card, EmptyState, Input, PageLoader } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { formatBytes } from '../../lib/format';
 import { toast } from '../../lib/toast';
+
+/** Stufe 3: einen Nutzer auf einem verbundenen Server anschreiben (Netzwerk-DM). */
+function NetworkDM() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const peers = useQuery({ queryKey: ['fed', 'peers'], queryFn: () => api.federation.peers() });
+  const [serverId, setServerId] = useState('');
+  const [username, setUsername] = useState('');
+  const start = useMutation({
+    mutationFn: async () => {
+      const chosen = serverId || peers.data![0].id;
+      const u = await api.network.lookupUser(chosen, username.trim());
+      const conv = await api.chat.direct(u.userId);
+      return conv.id;
+    },
+    onSuccess: (id) => navigate(`/chat/${id}`),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  if (!peers.data || peers.data.length === 0) return null;
+  return (
+    <Card className="space-y-3">
+      <h2 className="flex items-center gap-2 font-semibold">
+        <MessageSquare className="size-4" /> {t('network.dmTitle')}
+      </h2>
+      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <select value={serverId || peers.data[0].id} onChange={(e) => setServerId(e.target.value)} className="h-10 rounded-md border border-border bg-surface px-2 text-sm">
+          {peers.data.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <Input placeholder={t('network.dmUser')} value={username} onChange={(e) => setUsername(e.target.value)} />
+        <Button variant="primary" onClick={() => start.mutate()} disabled={start.isPending || !username.trim()}>
+          {t('network.dmStart')}
+        </Button>
+      </div>
+    </Card>
+  );
+}
 
 function NetworkGameCard({ game }: { game: NetworkGameDto }) {
   const { t } = useTranslation();
@@ -66,6 +108,7 @@ export default function NetworkPage() {
         </h1>
         <p className="text-sm text-muted">{t('network.intro')}</p>
       </div>
+      <NetworkDM />
       {games.data && games.data.length > 0 ? (
         <div className="grid gap-3 md:grid-cols-2">
           {games.data.map((g) => (

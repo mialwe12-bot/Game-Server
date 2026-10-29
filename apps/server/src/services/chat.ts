@@ -125,6 +125,16 @@ export class ChatService {
   }
 
   /** Neue Nachricht speichern und an alle Mitglieder verteilen. */
+  /** Findet oder erstellt die Direkt-Konversation zweier Nutzer. */
+  async ensureDirect(aId: string, bId: string, createdById: string): Promise<Conversation> {
+    const key = directKey(aId, bId);
+    const existing = await this.ctx.db.conversation.findUnique({ where: { directKey: key } });
+    if (existing) return existing;
+    return this.ctx.db.conversation.create({
+      data: { type: 'DIRECT', directKey: key, createdById, members: { create: [{ userId: aId }, { userId: bId }] } },
+    });
+  }
+
   async post(
     author: User,
     conversationId: string,
@@ -178,6 +188,16 @@ export class ChatService {
           { username: author.displayName ?? author.username, conversationId, preview, path: `/chat/${conversationId}` },
           { store: false },
         );
+      }
+    }
+    // Föderation Stufe 3: Direktnachricht an einen Remote-Partner an dessen Heimat-Server weiterleiten.
+    if (conv.type === 'DIRECT') {
+      const otherId = (conv.directKey ?? '').split(':').find((id) => id !== author.id);
+      if (otherId) {
+        const other = await db.user.findUnique({ where: { id: otherId } });
+        if (other?.federationServerId && other.federationUserId) {
+          void this.ctx.federation.forwardChatMessage(author, other, msg);
+        }
       }
     }
     return dto;

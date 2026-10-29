@@ -207,4 +207,44 @@ describe('Föderation Stufe 1', () => {
     const cb = await t.app.inject({ method: 'POST', url: '/api/auth/federated/callback', payload: { code: 'xxxxxxxxxx', state: 'ungueltig' } });
     expect(cb.statusCode).toBe(400);
   });
+
+  // --- Stufe 3: föderierter Chat ---
+
+  it('stellt eine föderierte Chat-Nachricht zu (Konversation, Schatten-Absender, Dedup)', async () => {
+    const peer = await selfAsPeer();
+    const bob = await t.app.ctx.db.user.findUnique({ where: { username: 'bob' } });
+    const payload = { federationId: 'msg-abc-1', from: { userId: 'remoteU', username: 'carla', displayName: 'Carla' }, toUserId: bob!.id, body: 'Hallo!', gifUrl: null, sentAt: new Date().toISOString() };
+    const r1 = await t.app.ctx.federation.deliverIncomingChat(peer, payload);
+    expect(r1).toEqual({ ok: true });
+    const shadow = await t.app.ctx.db.user.findFirst({ where: { federationServerId: peer.id, federationUserId: 'remoteU' } });
+    expect(shadow).toBeTruthy();
+    const msg = await t.app.ctx.db.message.findUnique({ where: { federationId: 'msg-abc-1' } });
+    expect(msg?.body).toBe('Hallo!');
+    expect(msg?.authorId).toBe(shadow!.id);
+    const r2 = await t.app.ctx.federation.deliverIncomingChat(peer, payload);
+    expect(r2.duplicate).toBe(true);
+  });
+
+  it('liefert lokale Nutzeridentität per Username (peer-signiert)', async () => {
+    await selfAsPeer();
+    const okHeaders = await selfSignedHeaders('GET', '/api/federation/users/admin');
+    const ok = await t.app.inject({ method: 'GET', url: '/api/federation/users/admin', headers: okHeaders });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().username).toBe('admin');
+    const missHeaders = await selfSignedHeaders('GET', '/api/federation/users/gibtsnicht');
+    const miss = await t.app.inject({ method: 'GET', url: '/api/federation/users/gibtsnicht', headers: missHeaders });
+    expect(miss.statusCode).toBe(404);
+  });
+
+  it('nimmt eine föderierte Chat-Nachricht über die peer-signierte Route an', async () => {
+    await selfAsPeer();
+    const bob = await t.app.ctx.db.user.findUnique({ where: { username: 'bob' } });
+    const path = '/api/federation/chat/deliver';
+    const headers = await selfSignedHeaders('POST', path);
+    const payload = { federationId: 'msg-http-1', from: { userId: 'rem2', username: 'dora', displayName: 'Dora' }, toUserId: bob!.id, body: 'Via HTTP', gifUrl: null, sentAt: new Date().toISOString() };
+    const res = await t.app.inject({ method: 'POST', url: path, headers, payload });
+    expect(res.statusCode).toBe(200);
+    const msg = await t.app.ctx.db.message.findUnique({ where: { federationId: 'msg-http-1' } });
+    expect(msg?.body).toBe('Via HTTP');
+  });
 });

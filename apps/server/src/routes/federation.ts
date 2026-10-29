@@ -9,6 +9,7 @@ import type {
   RemoteGameDto,
 } from '@gameserver/shared';
 import { requireAdmin, requireAuth } from '../plugins/auth.js';
+import { notFound } from '../lib/errors.js';
 import { iso } from '../lib/time.js';
 
 /**
@@ -70,6 +71,42 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req) => {
       const { user } = requireAuth(req);
       return fed.authorizeApprove(user, req.body.origin, req.body.redirect, req.body.state);
+    },
+  );
+
+  // --- Stufe 3: Heimat-Server liefert Identität eines lokalen Nutzers (peer-signiert) ---
+  app.get(
+    '/federation/users/:username',
+    { schema: { tags: ['federation'], summary: 'Nutzeridentität für Netzwerk-DM', params: z.object({ username: z.string().min(1).max(60) }) }, config: { skipCsrf: true } },
+    async (req) => {
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+      const identity = await fed.localUserIdentity(req.params.username);
+      if (!identity) throw notFound('Nutzer nicht gefunden');
+      return identity;
+    },
+  );
+
+  // --- Stufe 3: eingehende föderierte Chat-Nachricht (peer-signiert) ---
+  app.post(
+    '/federation/chat/deliver',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Föderierte Chat-Nachricht zustellen',
+        body: z.object({
+          federationId: z.string().min(5).max(60),
+          from: z.object({ userId: z.string().max(60), username: z.string().max(60), displayName: z.string().max(200).nullable() }),
+          toUserId: z.string().max(60),
+          body: z.string().max(4000),
+          gifUrl: z.string().url().max(500).nullable(),
+          sentAt: z.string().max(40),
+        }),
+      },
+      config: { skipCsrf: true },
+    },
+    async (req) => {
+      const peer = await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+      return fed.deliverIncomingChat(peer, req.body);
     },
   );
 
@@ -165,6 +202,17 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     async (req): Promise<RemoteDownloadDto> => {
       requireAuth(req);
       return fed.requestDownload(req.params.serverId, req.params.buildId);
+    },
+  );
+
+  // --- Stufe 3: Remote-Nutzer suchen, um eine Netzwerk-DM zu starten ---
+  app.post(
+    '/network/users/lookup',
+    { schema: { tags: ['federation'], summary: 'Nutzer auf einem verbundenen Server suchen', body: z.object({ serverId: z.string(), username: z.string().min(1).max(60) }) } },
+    async (req): Promise<{ userId: string; username: string; displayName: string | null }> => {
+      requireAuth(req);
+      const user = await fed.lookupRemoteUser(req.body.serverId, req.body.username);
+      return { userId: user.id, username: user.username, displayName: user.displayName };
     },
   );
 };

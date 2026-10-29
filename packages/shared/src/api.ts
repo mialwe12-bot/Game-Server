@@ -563,6 +563,9 @@ export class ApiClient {
     games: () => this.get<NetworkGameDto[]>('/network/games'),
     download: (serverId: string, buildId: string) =>
       this.post<RemoteDownloadDto>(`/network/games/${serverId}/builds/${encodeURIComponent(buildId)}/download`),
+    // Stufe 3: Remote-Nutzer suchen, um eine Netzwerk-DM zu starten
+    lookupUser: (serverId: string, username: string) =>
+      this.post<{ userId: string; username: string; displayName: string | null }>('/network/users/lookup', { serverId, username }),
   };
 
   // ---- Desktop-Client-Releases ----

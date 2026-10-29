@@ -261,7 +261,31 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - **Tests**: 7 zusätzliche in `federation.test.ts` (State, Code-Eintausch direkt + peer-signiert, Schatten-User,
   peers-Route, approve-Gate, Callback-State). Gesamt 115 Server-Tests grün.
 - **Offen Stufe 2**: Desktop-Client-Login über Netzwerk (Loopback-Flow wie SSO), serverübergreifende Avatare, Rollen-Mapping.
-- **Stufe 3** = föderierter Chat. **Fluxer eingebetteter Voice-Client** = Task #20.
+
+### Föderation Stufe 3 (fertig: föderierter Chat / Netzwerk-DMs)
+- Direktnachrichten über Servergrenzen: Nutzer A (Heimat-Server A) schreibt Nutzer R (Heimat-Server B). Auf jeder Seite ist
+  die DM eine DIRECT-Konversation zwischen dem lokalen Nutzer und einem **Schatten-Konto** des Remote-Partners.
+- **Schema** (Migration `federation_chat`): `Message.federationId String? @unique` (Dedup der zugestellten Nachricht).
+- **Dienst** (`services/federation.ts`): `localUserIdentity` (Heimat liefert Identität per Username), `lookupRemoteUser`
+  (B sucht Remote-Nutzer + legt Schatten-Konto an), `forwardChatMessage` (best-effort-Weiterleitung an den Heimat-Server,
+  Fehler nur geloggt), `deliverIncomingChat` (Empfang: Dedup → lokalen Empfänger finden → Absender-Schatten provisionieren →
+  Block prüfen → `chat.ensureDirect` → Nachricht anlegen, WS `chat.message` + Benachrichtigung). `signedFetch` nimmt jetzt
+  optional einen JSON-Body (für `/chat/deliver`); **Body wird NICHT signiert** – Integrität ruht auf TLS + vertrauenswürdigem
+  Peer + `federationId`-Dedup (bewusste Vereinfachung für Stufe 3).
+- **ChatService**: neue Methode `ensureDirect`; `post()` leitet Nachrichten in DIRECT-Konversationen mit Schatten-Partner
+  per `federation.forwardChatMessage` (fire-and-forget) weiter.
+- **Routen**: peer-signiert `GET /api/federation/users/:username`, `POST /api/federation/chat/deliver`; Nutzer
+  `POST /api/network/users/lookup` (Remote-Nutzer suchen → DM starten). API: `network.lookupUser`.
+- **Web**: `NetworkPage` bekam `NetworkDM` (Server wählen + Username → `lookupUser` → `chat.direct` → `/chat/:id`); i18n
+  `network.dm*` (DE+EN).
+- **Tests**: +3 in `federation.test.ts` (Zustellung inkl. Dedup/Schatten-Absender, Identitäts-Route, deliver-Route). Gesamt
+  118 Server-Tests grün.
+- **Offen Stufe 3**: Gruppen-/Kanal-Föderation (nur DMs umgesetzt), Zustellquittungen/Retry-Queue (aktuell best-effort),
+  Präsenz über Server, Avatare.
+
+### Noch offen aus „ALLES"
+- **Desktop-Client: föderierte (Ordner-)Downloads** (Task #19) – Client nutzt die signierten Remote-URLs.
+- **Fluxer eingebetteter Voice-Client** (Task #20) – braucht zum Live-Test OAuth2-App auf `chat.nebendahl.eu`.
 
 ## Konventionen
 
