@@ -73,3 +73,20 @@ export interface RemoteDownloadDto {
   kind: BuildKind;
   files: RemoteFileDto[];
 }
+
+// --- Stufe 2: geteilte Accounts (föderierter Login) ---
+
+/** Öffentlich sichtbarer verbundener Server (für den Login-Auswahldialog). */
+export interface FederationPeer {
+  id: string;
+  name: string;
+  baseUrl: string;
+}
+
+/** Identität eines Nutzers, die der Heimat-Server beim föderierten Login übergibt. */
+export interface FederatedIdentity {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}

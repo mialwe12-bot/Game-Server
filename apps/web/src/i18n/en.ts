@@ -96,6 +96,7 @@ const en: Translation = {
     registrationClosed: 'Registration is currently closed.',
     registrationInvite: 'Registration by invitation only.',
     sso: 'Sign in with {{name}}',
+    networkLogin: 'Sign in with {{name}}',
     or: 'or',
     mfaTitle: 'Two-factor verification',
     mfaText: 'Enter the 6-digit code from your authenticator app or a recovery code.',
@@ -1484,6 +1485,14 @@ const en: Translation = {
     folderHint: 'This folder build is best downloaded via the desktop client.',
     emptyTitle: 'No network games',
     emptyDesc: "Once your server is connected to others, their public games appear here.",
+  },
+  federatedAuth: {
+    title: 'Confirm sign-in',
+    prompt: '{{origin}} wants to sign you in with your account ({{user}}).',
+    approve: 'Allow',
+    invalid: 'Invalid or expired sign-in request.',
+    finishTitle: 'Signing in …',
+    finishing: 'Signing you in …',
   },
   errors: {
     generic: 'Something went wrong.',

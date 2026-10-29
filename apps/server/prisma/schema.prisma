@@ -96,6 +96,10 @@ model User {
   totpLastCounter  Int?
   recoveryCodes    String[]  @default([])
   oidcSubject      String?   @unique
+  // Föderation Stufe 2: Schatten-Konto eines Nutzers von einem verbundenen Heimat-Server.
+  federationServerId String?
+  federationServer   FederatedServer? @relation("FederatedUsers", fields: [federationServerId], references: [id], onDelete: SetNull)
+  federationUserId   String?
   uploadQuotaBytes BigInt?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -175,6 +179,8 @@ model User {
   codesCreated          ActivationCode[]
   codeRedemptions       CodeRedemption[]
   gameNotes             GameNote[]
+
+  @@unique([federationServerId, federationUserId])
 }
 
 model Session {
@@ -1279,6 +1285,8 @@ model FederatedServer {
   catalog      Json             @default("[]") // zwischengespeicherter Remote-Katalog (RemoteGameDto[])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+
+  users User[] @relation("FederatedUsers")
 
   @@index([status])
 }

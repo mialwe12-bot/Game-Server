@@ -238,8 +238,30 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
   für Tests:** `resetDb` truncatet `Setting` (auch den Föderationsschlüssel), der Dienst-Cache muss danach via
   `ctx.federation.init()` neu geladen werden (in Produktion nie nötig). Gesamt 108 Server-Tests grün.
 - **Offen (Stufe 1-Reste/später)**: Desktop-Client-Unterstützung für föderierte (Ordner-)Downloads, Merge der
-  Netzwerk-Spiele in den Haupt-Store, Download-Zählung über Server-Grenzen. **Stufe 2** = geteilte Accounts
-  (Heimat-Server/SSO), **Stufe 3** = föderierter Chat. **Fluxer eingebetteter Voice-Client** = Task #17.
+  Netzwerk-Spiele in den Haupt-Store, Download-Zählung über Server-Grenzen.
+
+### Föderation Stufe 2 (fertig: geteilte Accounts / föderierter Login)
+- Ziel „gleiche Accounts": Nutzer eines Heimat-Servers können sich auf jedem verbundenen Server anmelden. OAuth-ähnlicher,
+  Ed25519/HMAC-abgesicherter Browser-Flow; auf dem besuchenden Server entsteht ein **Schatten-Konto** (Rolle USER).
+- **Schema** (Migration `federation_accounts`, von Hand geschrieben wegen non-interaktivem `migrate dev`): User +
+  `federationServerId` (FK → FederatedServer, onDelete SetNull) + `federationUserId`, `@@unique`. FederatedServer `users User[]`.
+- **Dienst** (`services/federation.ts`): `signLoginState/verifyLoginState` (zustandsloser, HMAC-signierter State mit
+  appSecret – kein Cookie), `createAuthCode/exchangeAuthCode` (einmalige Login-Codes im Speicher, 5 min, an Peer gebunden),
+  `buildIdentity` (Avatar bewusst null in Stufe 2), `authorizeApprove` (Open-Redirect-Schutz: redirect muss zum Peer gehören),
+  `startFederatedLogin` (baut Authorize-URL), `exchangeWithPeer` (B→A signiert), `provisionFederatedUser` (Schatten-User,
+  Username `<base>-<6hex vom baseUrl>`, synthetische E-Mail `fed_<id>_<tag>@<host>.federated`, kein Passwort).
+- **Flow**: B-Login-Seite zeigt Buttons je aktivem Peer (`GET /api/federation/peers`, öffentlich) → `POST /api/auth/federated/start`
+  liefert Authorize-URL → Browser zu A `/federated-authorize` (SPA, RequireAuth → bei Bedarf Login mit `next`) → Nutzer bestätigt
+  → `POST /api/federation/authorize/approve` gibt `redirectUrl` (B-Callback mit code+state) → Browser zu B `/federated-login` →
+  `POST /api/auth/federated/callback` prüft State, tauscht Code via `POST /api/federation/auth/exchange/:code` (peer-signiert),
+  provisioniert Schatten-User, `completeLogin` (WEB-Session).
+- **Web**: LoginPage `NetworkLogin`-Abschnitt; Seiten `pages/auth/FederatedAuthorizePage.tsx` (`/federated-authorize`),
+  `FederatedLoginPage.tsx` (`/federated-login`); i18n `auth.networkLogin`, `federatedAuth.*` (DE+EN). API: `federation.peers`,
+  `federation.authorizeApprove`, `auth.federatedStart`, `auth.federatedCallback` (setzt csrfToken).
+- **Tests**: 7 zusätzliche in `federation.test.ts` (State, Code-Eintausch direkt + peer-signiert, Schatten-User,
+  peers-Route, approve-Gate, Callback-State). Gesamt 115 Server-Tests grün.
+- **Offen Stufe 2**: Desktop-Client-Login über Netzwerk (Loopback-Flow wie SSO), serverübergreifende Avatare, Rollen-Mapping.
+- **Stufe 3** = föderierter Chat. **Fluxer eingebetteter Voice-Client** = Task #20.
 
 ## Konventionen
 

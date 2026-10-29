@@ -63,6 +63,30 @@ export async function checkSecondFactor(ctx: AppContext, user: User, code: strin
 
 export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   const ctx = app.ctx;
+
+  // Stufe 2: föderierter Login – über einen verbundenen Server anmelden
+  app.post(
+    '/federated/start',
+    { schema: { tags: ['auth'], summary: 'Login über einen verbundenen Server starten', body: z.object({ serverId: z.string() }) }, config: { skipCsrf: true, allowInMaintenance: true } },
+    async (req) => ctx.federation.startFederatedLogin(req.body.serverId),
+  );
+
+  app.post(
+    '/federated/callback',
+    { schema: { tags: ['auth'], summary: 'Föderierten Login abschließen', body: z.object({ code: z.string().min(10).max(200), state: z.string().max(600) }) }, config: { skipCsrf: true, allowInMaintenance: true } },
+    async (req, reply): Promise<AuthSuccess> => {
+      const serverId = ctx.federation.verifyLoginState(req.body.state);
+      if (!serverId) throw badRequest('Login-Sitzung ungültig oder abgelaufen', 'federation_bad_state');
+      const peer = await ctx.db.federatedServer.findUnique({ where: { id: serverId } });
+      if (!peer || peer.status !== 'ACTIVE') throw badRequest('Server nicht verbunden', 'federation_unknown');
+      const identity = await ctx.federation.exchangeWithPeer(peer, req.body.code);
+      const user = await ctx.federation.provisionFederatedUser(peer.id, identity);
+      if (user.disabled) throw forbidden('Konto deaktiviert', 'account_disabled');
+      const settings = await ctx.settings.get();
+      if (settings.maintenanceMode && user.role !== 'ADMIN') throw forbidden('Wartungsmodus', 'maintenance');
+      return completeLogin(ctx, req, reply, user, 'WEB');
+    },
+  );
   const authLimit = { rateLimit: { max: ctx.config.AUTH_RATE_LIMIT_MAX, timeWindow: '1 minute' } };
 
   app.get(

@@ -50,6 +50,29 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // --- Stufe 2: öffentliche Liste aktiver Peers (für den Login-Auswahldialog) ---
+  app.get('/federation/peers', { schema: { tags: ['federation'], summary: 'Verbundene Server (für föderierten Login)' }, config: { allowInMaintenance: true } }, async () => fed.listPeers());
+
+  // --- Stufe 2: Heimat-Server tauscht Login-Code gegen Identität (peer-signiert) ---
+  app.post(
+    '/federation/auth/exchange/:code',
+    { schema: { tags: ['federation'], summary: 'Login-Code gegen Nutzeridentität eintauschen', params: z.object({ code: z.string().min(10).max(200) }) }, config: { skipCsrf: true } },
+    async (req) => {
+      const peer = await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+      return fed.exchangeAuthCode(req.params.code, peer.id);
+    },
+  );
+
+  // --- Stufe 2: Heimat-Server erteilt Zustimmung (angemeldeter Nutzer) ---
+  app.post(
+    '/federation/authorize/approve',
+    { schema: { tags: ['federation'], summary: 'Föderierten Login für einen anderen Server bestätigen', body: z.object({ origin: z.string().url().max(300), redirect: z.string().url().max(400), state: z.string().max(600) }) } },
+    async (req) => {
+      const { user } = requireAuth(req);
+      return fed.authorizeApprove(user, req.body.origin, req.body.redirect, req.body.state);
+    },
+  );
+
   // --- Per Pairing-Code: eingehende Anmeldung eines anderen Servers ---
   app.post(
     '/federation/pair',

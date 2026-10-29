@@ -94,6 +94,7 @@ const de = {
     registrationClosed: 'Die Registrierung ist derzeit geschlossen.',
     registrationInvite: 'Registrierung nur mit Einladung.',
     sso: 'Anmelden mit {{name}}',
+    networkLogin: 'Mit {{name}} anmelden',
     or: 'oder',
     mfaTitle: 'Zwei-Faktor-Bestätigung',
     mfaText: 'Gib den 6-stelligen Code aus deiner Authenticator-App oder einen Recovery-Code ein.',
@@ -1483,6 +1484,14 @@ const de = {
     folderHint: 'Dieser Ordner-Build wird am besten über den Desktop-Client geladen.',
     emptyTitle: 'Keine Netzwerk-Spiele',
     emptyDesc: 'Sobald dein Server mit anderen verbunden ist, erscheinen hier deren öffentliche Spiele.',
+  },
+  federatedAuth: {
+    title: 'Anmeldung bestätigen',
+    prompt: '{{origin}} möchte dich mit deinem Konto ({{user}}) anmelden.',
+    approve: 'Erlauben',
+    invalid: 'Ungültige oder abgelaufene Anmeldeanfrage.',
+    finishTitle: 'Anmeldung läuft …',
+    finishing: 'Du wirst angemeldet …',
   },
   errors: {
     generic: 'Etwas ist schiefgelaufen.',

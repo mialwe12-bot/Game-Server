@@ -132,4 +132,79 @@ describe('Föderation Stufe 1', () => {
     const denied = await user.req('POST', '/api/admin/federation/pairing-code');
     expect(denied.statusCode).toBe(403);
   });
+
+  // --- Stufe 2: geteilte Accounts (föderierter Login) ---
+
+  it('signiert und prüft den Login-State (zustandslos)', () => {
+    const fed = t.app.ctx.federation;
+    const state = fed.signLoginState('srv123');
+    expect(fed.verifyLoginState(state)).toBe('srv123');
+    expect(fed.verifyLoginState(`${state}x`)).toBeNull();
+    expect(fed.verifyLoginState('kaputt')).toBeNull();
+  });
+
+  it('tauscht einen Login-Code nur für den ausstellenden Peer ein', async () => {
+    const peer = await selfAsPeer();
+    const adminUser = await t.app.ctx.db.user.findUnique({ where: { username: 'admin' } });
+    const code = t.app.ctx.federation.createAuthCode(adminUser!.id, peer.id);
+    const identity = await t.app.ctx.federation.exchangeAuthCode(code, peer.id);
+    expect(identity.username).toBe('admin');
+    // einmalig
+    await expect(t.app.ctx.federation.exchangeAuthCode(code, peer.id)).rejects.toThrow();
+    // falscher Peer
+    const code2 = t.app.ctx.federation.createAuthCode(adminUser!.id, peer.id);
+    await expect(t.app.ctx.federation.exchangeAuthCode(code2, 'anderer-peer')).rejects.toThrow();
+  });
+
+  it('legt ein Schatten-Konto an und aktualisiert es beim erneuten Login', async () => {
+    const peer = await selfAsPeer();
+    const fed = t.app.ctx.federation;
+    const u1 = await fed.provisionFederatedUser(peer.id, { userId: 'remote1', username: 'alice', displayName: 'Alice', avatarUrl: null });
+    expect(u1.federationServerId).toBe(peer.id);
+    expect(u1.federationUserId).toBe('remote1');
+    const u2 = await fed.provisionFederatedUser(peer.id, { userId: 'remote1', username: 'alice', displayName: 'Alice Neu', avatarUrl: null });
+    expect(u2.id).toBe(u1.id);
+    expect(u2.displayName).toBe('Alice Neu');
+  });
+
+  it('listet aktive Peers öffentlich unter /api/federation/peers', async () => {
+    await selfAsPeer();
+    const res = await t.app.inject({ method: 'GET', url: '/api/federation/peers' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().some((p: { name: string }) => p.name === 'Peer')).toBe(true);
+  });
+
+  it('tauscht den Login-Code über die peer-signierte Route ein', async () => {
+    const peer = await selfAsPeer();
+    const adminUser = await t.app.ctx.db.user.findUnique({ where: { username: 'admin' } });
+    const code = t.app.ctx.federation.createAuthCode(adminUser!.id, peer.id);
+    const path = `/api/federation/auth/exchange/${code}`;
+    const headers = await selfSignedHeaders('POST', path);
+    const res = await t.app.inject({ method: 'POST', url: path, headers });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().username).toBe('admin');
+  });
+
+  it('bestätigt den Login nur angemeldet und mit gültiger Rücksprungadresse', async () => {
+    await selfAsPeer('https://peer.example');
+    const body = { origin: 'https://peer.example', redirect: 'https://peer.example/federated-login', state: 'abc' };
+    const ok = await admin.req('POST', '/api/federation/authorize/approve', body);
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().redirectUrl).toContain('code=');
+    // fremde Rücksprungadresse → abgelehnt
+    const bad = await admin.req('POST', '/api/federation/authorize/approve', { ...body, redirect: 'https://boese.example/klau' });
+    expect(bad.statusCode).toBe(400);
+    // ohne Login → 401
+    const anon = await t.app.inject({ method: 'POST', url: '/api/federation/authorize/approve', payload: body });
+    expect(anon.statusCode).toBe(401);
+  });
+
+  it('startet föderierten Login und weist ungültigen State im Callback ab', async () => {
+    const peer = await selfAsPeer();
+    const start = await t.app.inject({ method: 'POST', url: '/api/auth/federated/start', payload: { serverId: peer.id } });
+    expect(start.statusCode).toBe(200);
+    expect(start.json().url).toContain('/federated-authorize');
+    const cb = await t.app.inject({ method: 'POST', url: '/api/auth/federated/callback', payload: { code: 'xxxxxxxxxx', state: 'ungueltig' } });
+    expect(cb.statusCode).toBe(400);
+  });
 });

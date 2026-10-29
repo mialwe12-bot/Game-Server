@@ -13,6 +13,8 @@ import { useAuth } from './lib/auth';
 import AccountPage from './pages/account/AccountPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import LoginPage from './pages/auth/LoginPage';
+import FederatedAuthorizePage from './pages/auth/FederatedAuthorizePage';
+import FederatedLoginPage from './pages/auth/FederatedLoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import ClientDownloadPage from './pages/ClientDownloadPage';
@@ -73,6 +75,8 @@ export default function App() {
       {!blocked && <Route path="/big-picture" element={authed(<BigPicturePage />)} />}
       <Route element={<Layout />}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/federated-authorize" element={<RequireAuth><FederatedAuthorizePage /></RequireAuth>} />
+        <Route path="/federated-login" element={<FederatedLoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />

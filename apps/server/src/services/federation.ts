@@ -1,8 +1,10 @@
-import { createPrivateKey, createPublicKey, randomBytes, sign as edSign, verify as edVerify } from 'node:crypto';
-import type { FederatedServer } from '@prisma/client';
+import { createHash, createHmac, createPrivateKey, createPublicKey, randomBytes, sign as edSign, timingSafeEqual, verify as edVerify } from 'node:crypto';
+import type { FederatedServer, User } from '@prisma/client';
 import type {
+  FederatedIdentity,
   FederatedServerDto,
   FederationInfo,
+  FederationPeer,
   NetworkGameDto,
   RemoteBuildDto,
   RemoteDownloadDto,
@@ -46,14 +48,18 @@ export function federatedServerDto(s: FederatedServer): FederatedServerDto {
  */
 export class FederationService {
   private keys: { publicKey: string; privateKey: string } | null = null;
+  private appSecret = '';
   /** Offene Pairing-Codes dieses Servers: Code -> Ablaufzeitpunkt (ms). */
   private readonly pairings = new Map<string, number>();
+  /** Offene Login-Codes (Stufe 2): Code -> {userId, peerId, Ablauf}. */
+  private readonly authCodes = new Map<string, { userId: string; peerId: string; exp: number }>();
   private timer: NodeJS.Timeout | null = null;
 
   constructor(private readonly ctx: AppContext) {}
 
   async init(): Promise<void> {
     this.keys = await this.ctx.settings.federationKeys();
+    this.appSecret = await this.ctx.settings.appSecret(this.ctx.config.APP_SECRET);
   }
 
   /** Öffentliche Basis-URL dieses Servers (aus PUBLIC_URL). */
@@ -328,6 +334,124 @@ export class FederationService {
     if (res.status === 404) throw notFound('Build auf dem Herkunftsserver nicht gefunden');
     if (!res.ok) throw badRequest(`Herkunftsserver lehnte den Download ab (HTTP ${res.status})`, 'federation_download_failed');
     return (await res.json()) as RemoteDownloadDto;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stufe 2: geteilte Accounts (föderierter Login)
+  // ---------------------------------------------------------------------------
+
+  /** Öffentliche Liste aktiver verbundener Server (für den Login-Auswahldialog). */
+  async listPeers(): Promise<FederationPeer[]> {
+    const rows = await this.ctx.db.federatedServer.findMany({ where: { status: 'ACTIVE' }, orderBy: { name: 'asc' } });
+    return rows.map((s) => ({ id: s.id, name: s.name, baseUrl: s.baseUrl }));
+  }
+
+  private hmac(data: string): string {
+    return createHmac('sha256', this.appSecret).update(data).digest('base64url');
+  }
+
+  /** Zustandsloser, signierter Login-State (bindet Peer-ID + Ablauf; kein Cookie nötig). */
+  signLoginState(serverId: string): string {
+    const payload = Buffer.from(JSON.stringify({ s: serverId, e: Date.now() + 10 * 60_000, n: randomBytes(9).toString('base64url') })).toString('base64url');
+    return `${payload}.${this.hmac(payload)}`;
+  }
+
+  verifyLoginState(state: string): string | null {
+    const [payload, sig] = String(state).split('.');
+    if (!payload || !sig) return null;
+    const expected = this.hmac(payload);
+    if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    try {
+      const { s, e } = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { s: string; e: number };
+      if (typeof s !== 'string' || typeof e !== 'number' || e < Date.now()) return null;
+      return s;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Erzeugt einen einmaligen Login-Code (auf dem Heimat-Server), gebunden an den anfragenden Peer. */
+  createAuthCode(userId: string, peerId: string): string {
+    this.gcAuthCodes();
+    const code = randomBytes(24).toString('base64url');
+    this.authCodes.set(code, { userId, peerId, exp: Date.now() + 5 * 60_000 });
+    return code;
+  }
+
+  private consumeAuthCode(code: string, peerId: string): string | null {
+    this.gcAuthCodes();
+    const e = this.authCodes.get(code);
+    if (!e || e.exp < Date.now() || e.peerId !== peerId) return null;
+    this.authCodes.delete(code);
+    return e.userId;
+  }
+
+  private gcAuthCodes(): void {
+    const now = Date.now();
+    for (const [code, e] of this.authCodes) if (e.exp < now) this.authCodes.delete(code);
+  }
+
+  /** Identität eines lokalen Nutzers, die an einen Peer übergeben wird. */
+  buildIdentity(user: User): FederatedIdentity {
+    // Avatar bewusst weggelassen (serverübergreifende signierte Avatare in einer späteren Stufe).
+    return { userId: user.id, username: user.username, displayName: user.displayName ?? user.username, avatarUrl: null };
+  }
+
+  /** Auf dem Heimat-Server: Login-Code gegen Identität eintauschen (nur für den ausstellenden Peer). */
+  async exchangeAuthCode(code: string, peerId: string): Promise<FederatedIdentity> {
+    const userId = this.consumeAuthCode(code, peerId);
+    if (!userId) throw forbidden('Login-Code ungültig oder abgelaufen', 'federation_bad_code');
+    const user = await this.ctx.db.user.findUnique({ where: { id: userId } });
+    if (!user || user.disabled) throw forbidden('Konto nicht verfügbar', 'account_unavailable');
+    return this.buildIdentity(user);
+  }
+
+  /** Auf dem Heimat-Server: Zustimmung erteilen und Rücksprung-URL mit Code bauen. */
+  async authorizeApprove(user: User, origin: string, redirect: string, state: string): Promise<{ redirectUrl: string }> {
+    const peer = await this.ctx.db.federatedServer.findUnique({ where: { baseUrl: normalizeBaseUrl(origin) } });
+    if (!peer || peer.status !== 'ACTIVE') throw forbidden('Unbekannter oder gesperrter Server', 'federation_unknown');
+    // Schutz vor offenen Weiterleitungen: Rücksprung muss zum anfragenden Peer gehören.
+    if (redirect !== peer.baseUrl && !redirect.startsWith(`${peer.baseUrl}/`)) throw badRequest('Ungültige Rücksprungadresse', 'federation_bad_redirect');
+    const code = this.createAuthCode(user.id, peer.id);
+    const sep = redirect.includes('?') ? '&' : '?';
+    return { redirectUrl: `${redirect}${sep}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}` };
+  }
+
+  /** Auf dem besuchenden Server: Login über einen verbundenen Server starten (liefert die Authorize-URL). */
+  async startFederatedLogin(serverId: string): Promise<{ url: string }> {
+    const peer = await this.ctx.db.federatedServer.findUnique({ where: { id: serverId } });
+    if (!peer || peer.status !== 'ACTIVE') throw notFound('Server nicht verbunden');
+    const state = this.signLoginState(peer.id);
+    const me = this.baseUrl();
+    const url = `${peer.baseUrl}/federated-authorize?origin=${encodeURIComponent(me)}&redirect=${encodeURIComponent(`${me}/federated-login`)}&state=${encodeURIComponent(state)}`;
+    return { url };
+  }
+
+  /** Auf dem besuchenden Server: Code beim Heimat-Server gegen die Identität eintauschen. */
+  async exchangeWithPeer(peer: FederatedServer, code: string): Promise<FederatedIdentity> {
+    const res = await this.signedFetch(peer.baseUrl, 'POST', `/api/federation/auth/exchange/${encodeURIComponent(code)}`);
+    if (!res.ok) throw badRequest(`Identitätsabgleich fehlgeschlagen (HTTP ${res.status})`, 'federation_exchange_failed');
+    return (await res.json()) as FederatedIdentity;
+  }
+
+  /** Legt das lokale Schatten-Konto eines Remote-Nutzers an oder aktualisiert es. */
+  async provisionFederatedUser(serverId: string, identity: FederatedIdentity): Promise<User> {
+    const existing = await this.ctx.db.user.findFirst({ where: { federationServerId: serverId, federationUserId: identity.userId } });
+    const displayName = identity.displayName ?? identity.username;
+    if (existing) return this.ctx.db.user.update({ where: { id: existing.id }, data: { displayName } });
+
+    const server = await this.ctx.db.federatedServer.findUnique({ where: { id: serverId } });
+    const tag = createHash('sha1').update(server?.baseUrl ?? serverId).digest('hex').slice(0, 6);
+    const base = (identity.username || 'user').replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 24) || 'user';
+    let username = `${base}-${tag}`.slice(0, 36);
+    for (let i = 2; await this.ctx.db.user.findFirst({ where: { username: { equals: username, mode: 'insensitive' } } }); i++) {
+      username = `${base}${i}-${tag}`.slice(0, 36);
+    }
+    const host = server ? new URL(server.baseUrl).host : serverId;
+    const email = `fed_${identity.userId}_${tag}@${host}.federated`.toLowerCase().slice(0, 180);
+    return this.ctx.db.user.create({
+      data: { username, email, displayName, role: 'USER', federationServerId: serverId, federationUserId: identity.userId },
+    });
   }
 
   // ---------------------------------------------------------------------------

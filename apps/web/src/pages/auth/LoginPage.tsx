@@ -1,4 +1,5 @@
-import { Globe, KeyRound, Server } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Globe, KeyRound, Network, Server } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -7,6 +8,7 @@ import { desktop, desktopError, isDesktop } from '../../desktop/bridge';
 import { useDesktop } from '../../desktop/DesktopProvider';
 import { api, errorMessage, setApiSession } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { toast } from '../../lib/toast';
 import { AuthCard, FormError } from './AuthCard';
 
 export default function LoginPage() {
@@ -179,6 +181,44 @@ export default function LoginPage() {
           </a>
         </>
       )}
+      {!isDesktop && !challenge && <NetworkLogin />}
     </AuthCard>
+  );
+}
+
+/** Stufe 2: Anmelden über einen verbundenen Server im Netzwerk. */
+function NetworkLogin() {
+  const { t } = useTranslation();
+  const peers = useQuery({ queryKey: ['fed', 'peers'], queryFn: () => api.federation.peers() });
+  if (!peers.data || peers.data.length === 0) return null;
+  const go = async (serverId: string) => {
+    try {
+      const { url } = await api.auth.federatedStart(serverId);
+      window.location.href = url;
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
+  return (
+    <>
+      <div className="my-5 flex items-center gap-3 text-xs text-muted">
+        <span className="h-px flex-1 bg-border" />
+        {t('auth.or')}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      <div className="space-y-2">
+        {peers.data.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => void go(p.id)}
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-surface-2 text-sm font-medium hover:bg-border"
+          >
+            <Network className="size-4" />
+            {t('auth.networkLogin', { name: p.name })}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }

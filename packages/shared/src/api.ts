@@ -114,6 +114,7 @@ import type {
   FederatedServerDto,
   FederationInfo,
   FederationPairingCode,
+  FederationPeer,
   FederationStatus,
   NetworkGameDto,
   RemoteDownloadDto,
@@ -380,6 +381,13 @@ export class ApiClient {
     forgotPassword: (email: string) => this.post<{ ok: true }>('/auth/password/forgot', { email }),
     resetPassword: (token: string, password: string) => this.post<{ ok: true }>('/auth/password/reset', { token, password }),
     checkInvite: (code: string) => this.get<{ valid: boolean; role: Role | null }>(`/auth/invite/${encodeURIComponent(code)}`),
+    // Stufe 2: föderierter Login (Anmelden über einen verbundenen Server)
+    federatedStart: (serverId: string) => this.post<{ url: string }>('/auth/federated/start', { serverId }),
+    federatedCallback: async (code: string, state: string) => {
+      const r = await this.post<AuthSuccess>('/auth/federated/callback', { code, state });
+      if ('csrfToken' in r && r.csrfToken) this.csrfToken = r.csrfToken;
+      return r;
+    },
     oidcStartUrl: (redirect = '/') => `${this.baseUrl}/api/auth/oidc/start${buildQuery({ redirect })}`,
   };
 
@@ -545,6 +553,9 @@ export class ApiClient {
     sync: (id: string) => this.post<FederatedServerDto>(`/admin/federation/servers/${id}/sync`),
     setStatus: (id: string, status: FederationStatus) => this.patch<FederatedServerDto>(`/admin/federation/servers/${id}`, { status }),
     remove: (id: string) => this.del<{ ok: true }>(`/admin/federation/servers/${id}`),
+    // Stufe 2: geteilte Accounts
+    peers: () => this.get<FederationPeer[]>('/federation/peers'),
+    authorizeApprove: (data: { origin: string; redirect: string; state: string }) => this.post<{ redirectUrl: string }>('/federation/authorize/approve', data),
   };
 
   // ---- Netzwerk-Katalog (Nutzersicht) ----
