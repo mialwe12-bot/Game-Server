@@ -201,6 +201,46 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - Test-Flake behoben: Marktplatz-Teil in `steam.test.ts` wählt die gewünschte Karte jetzt deterministisch (war von
   Zufalls-Drops abhängig).
 
+## Folgeauftrag 2 – Server-Verbund, Fluxer-Voice, Client-Fix (Stand)
+- **Client 0.4.1** gebaut und übergeben: enthält den Desktop-Login-ohne-Neustart-Fix (war im Code, altes 0.4.0-Binary
+  hatte ihn nicht) + **signiertes Auto-Update** aktiviert (`createUpdaterArtifacts=true`, Pubkey in `tauri.conf.json`,
+  privater Updater-Schlüssel + Passwort separat an den Nutzer übergeben, NICHT im Repo). Erst-Umstieg 0.4.0→0.4.1 muss
+  manuell installiert werden (altes Binary ohne Pubkey kann nicht auto-updaten); ab 0.4.1 läuft Auto-Update, sobald der
+  Release im Admin-Panel hochgeladen + `.sig` gesetzt ist. Server-Updater-Endpunkt (`/api/client/update/...`) existiert bereits.
+- **Nutzer-Entscheidungen** (per Rückfrage): Server-Verbund = **Voll-Föderation (Matrix-Stil)**, gestuft gebaut.
+  Fluxer-Voice = **echter eingebetteter Voice-Client** (großer Folgeblock, Task #17). Nur Voice über Fluxer – kein SSO,
+  keine Chat-Brücke. Fluxer ist Open-Source (github.com/fluxerapp/fluxer), Instanz des Nutzers: `chat.nebendahl.eu`,
+  API-Discovery über `/.well-known/fluxer` → `endpoints.api_public` + `/v1`; hat REST/OAuth2/Gateway/Voice (Calls,
+  Peer-to-peer-voice, Streams). Doku: docs.fluxer.app.
+
+### Föderation Stufe 1 (fertig: Katalog + Cross-Server-Download)
+- **Schema** (Migration `federation`): Modell `FederatedServer` (name, baseUrl unique, publicKey, status
+  PENDING/ACTIVE/BLOCKED, lastSyncedAt, lastError, catalog=JSON-Cache). Eigenes Ed25519-Schlüsselpaar in
+  `Setting internal.federationPublicKey/PrivateKey` (analog `appSecret`, Methode `settings.federationKeys()`).
+- **Dienst** `services/federation.ts`: Ed25519-Signatur (node:crypto `sign/verify`, Format null+SPKI/PKCS8-PEM),
+  kanonische Zeichenkette `METHOD\nPFAD\nTIMESTAMP` (Body wird NICHT signiert → alle Parameter im Pfad), ±5 min Clock-Skew.
+  Pairing-Codes kurzlebig im Speicher (15 min). `exportCatalog` (nur PUBLIC-Spiele, neueste veröffentlichte Version,
+  READY-Builds), `grantDownload` (signierte absolute Datei-URLs via `ctx.signer`, 24 h), `syncOne/syncAll` (periodisch alle
+  10 min + 10 s nach Start), `networkGames` (Cache-Merge mit Herkunftsserver), `connect`/`acceptPairing`.
+- **Routen** `routes/federation.ts` (ohne Prefix registriert): öffentlich `GET /api/federation/info`; peer-signiert
+  `GET /api/federation/games`, `POST /api/federation/download/:buildId`; per Code `POST /api/federation/pair`; Admin
+  `/api/admin/federation/{self,servers,pairing-code,connect,servers/:id(/sync),...}`; Nutzer `GET /api/network/games`,
+  `POST /api/network/games/:serverId/builds/:buildId/download`.
+- **Download ohne doppelte Bandbreite**: Herkunftsserver signiert Datei-URLs (`/api/builds/:buildId/files/:fileId?exp&sig`);
+  `downloads.ts` akzeptiert diese signierten URLs ohne Login (NUR für öffentliche, veröffentlichte, READY-Builds). Bytes
+  fließen direkt Herkunftsserver→Nutzer. Föderierte Downloads zählen (noch) nicht im downloadCount.
+- **Web**: Admin-Seite `pages/admin/FederationPage.tsx` (eigene Adresse teilen, Pairing-Code erzeugen, verbinden,
+  Server-Liste mit Sync/Sperren/Entfernen) unter `/admin/federation`; Nutzer-Seite `pages/network/NetworkPage.tsx` unter
+  `/network` (Netzwerk-Katalog mit Herkunfts-Badge, Einzeldatei-Download direkt, Ordner-Builds → Hinweis Desktop-Client).
+  i18n `federation.*`/`network.*` in DE+EN. `baseUrl` des Servers = `config.PUBLIC_URL`.
+- **Tests** `test/federation.test.ts` (10, grün): Export, signierte Download-URLs, Zugriffsschutz, Signatur gültig/
+  manipuliert/veraltet, Pairing-Code einmalig, info-Route, peer-signierte Routen, Netzwerk-Katalog, Admin-Gate. **Hinweis
+  für Tests:** `resetDb` truncatet `Setting` (auch den Föderationsschlüssel), der Dienst-Cache muss danach via
+  `ctx.federation.init()` neu geladen werden (in Produktion nie nötig). Gesamt 108 Server-Tests grün.
+- **Offen (Stufe 1-Reste/später)**: Desktop-Client-Unterstützung für föderierte (Ordner-)Downloads, Merge der
+  Netzwerk-Spiele in den Haupt-Store, Download-Zählung über Server-Grenzen. **Stufe 2** = geteilte Accounts
+  (Heimat-Server/SSO), **Stufe 3** = föderierter Chat. **Fluxer eingebetteter Voice-Client** = Task #17.
+
 ## Konventionen
 
 - Code-Kommentare und UI-Texte auf Deutsch (UI zusätzlich Englisch), Fehlermeldungen der API auf Deutsch mit maschinenlesbarem `error`-Code.

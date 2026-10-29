@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Activity, BarChart3, Camera, Cloud, Gamepad2, Gift, Home, Layers, Package, CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, Users, UsersRound, X, XCircle } from 'lucide-react';
+import { Activity, BarChart3, Camera, Cloud, Gamepad2, Gift, Home, Layers, Network, Package, CheckCircle2, ChevronDown, Download, Info, Library, LogOut, Menu, Monitor, Moon, Search, Server, Settings, Shield, SlidersHorizontal, Store, Sun, User, Users, UsersRound, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -88,6 +88,9 @@ function UserMenu() {
               )}
               <MenuLink to="/stats" icon={<BarChart3 className="size-4" />} onClick={() => setOpen(false)}>
                 {t('nav.stats')}
+              </MenuLink>
+              <MenuLink to="/network" icon={<Network className="size-4" />} onClick={() => setOpen(false)}>
+                {t('nav.network')}
               </MenuLink>
               {settings?.features.workshop && (
                 <MenuLink to="/workshop" icon={<Package className="size-4" />} onClick={() => setOpen(false)}>

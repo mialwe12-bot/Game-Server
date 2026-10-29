@@ -110,6 +110,14 @@ import type {
   WorkshopVersionDto,
   YearReview,
 } from './steam.js';
+import type {
+  FederatedServerDto,
+  FederationInfo,
+  FederationPairingCode,
+  FederationStatus,
+  NetworkGameDto,
+  RemoteDownloadDto,
+} from './federation.js';
 
 export class ApiError extends Error {
   constructor(
@@ -525,6 +533,25 @@ export class ApiClient {
     startBackup: (includeFiles: boolean) => this.post<BackupDto>('/admin/backups', { includeFiles }),
     deleteBackup: (id: string) => this.del<{ ok: true }>(`/admin/backups/${id}`),
     backupDownloadUrl: (id: string) => `${this.baseUrl}/api/admin/backups/${id}/download`,
+  };
+
+  // ---- Föderation (Stufe 1): Netzwerk aus mehreren Servern ----
+  federation = {
+    // Admin: verbundene Server verwalten
+    servers: () => this.get<FederatedServerDto[]>('/admin/federation/servers'),
+    self: () => this.get<FederationInfo>('/admin/federation/self'),
+    createPairingCode: () => this.post<FederationPairingCode>('/admin/federation/pairing-code'),
+    connect: (baseUrl: string, code: string) => this.post<FederatedServerDto>('/admin/federation/connect', { baseUrl, code }),
+    sync: (id: string) => this.post<FederatedServerDto>(`/admin/federation/servers/${id}/sync`),
+    setStatus: (id: string, status: FederationStatus) => this.patch<FederatedServerDto>(`/admin/federation/servers/${id}`, { status }),
+    remove: (id: string) => this.del<{ ok: true }>(`/admin/federation/servers/${id}`),
+  };
+
+  // ---- Netzwerk-Katalog (Nutzersicht) ----
+  network = {
+    games: () => this.get<NetworkGameDto[]>('/network/games'),
+    download: (serverId: string, buildId: string) =>
+      this.post<RemoteDownloadDto>(`/network/games/${serverId}/builds/${encodeURIComponent(buildId)}/download`),
   };
 
   // ---- Desktop-Client-Releases ----

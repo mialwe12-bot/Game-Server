@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Archive, BookOpen, FileText, Gamepad2, HardDrive, LayoutDashboard, Mail, Megaphone, Monitor, Settings, Users } from 'lucide-react';
+import { Archive, BookOpen, FileText, Gamepad2, HardDrive, LayoutDashboard, Mail, Megaphone, Monitor, Network, Settings, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
@@ -9,6 +9,7 @@ import AnnouncementsPage from './AnnouncementsPage';
 import BackupsPage from './BackupsPage';
 import ClientReleasesPage from './ClientReleasesPage';
 import DashboardPage from './DashboardPage';
+import FederationPage from './FederationPage';
 import GameEditPage from './GameEditPage';
 import GamesPage from './GamesPage';
 import InvitesPage from './InvitesPage';
@@ -74,6 +75,9 @@ export default function AdminRoutes() {
               <SideLink to="/admin/client" icon={<Monitor className="size-4" />}>
                 {t('admin.clientReleases')}
               </SideLink>
+              <SideLink to="/admin/federation" icon={<Network className="size-4" />}>
+                {t('admin.federation')}
+              </SideLink>
               <SideLink to="/admin/settings" icon={<Settings className="size-4" />}>
                 {t('admin.settings')}
               </SideLink>
@@ -101,6 +105,7 @@ export default function AdminRoutes() {
               <Route path="logs" element={<LogsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="client" element={<ClientReleasesPage />} />
+              <Route path="federation" element={<FederationPage />} />
             </>
           )}
           <Route path="*" element={<Navigate to="/admin" replace />} />

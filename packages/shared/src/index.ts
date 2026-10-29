@@ -5,3 +5,4 @@ export * from './format.js';
 export * from './desktop.js';
 export * from './social.js';
 export * from './steam.js';
+export * from './federation.js';

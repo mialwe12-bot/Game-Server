@@ -50,6 +50,7 @@ const YearReviewPage = lazy(() => import('./pages/stats/YearReviewPage'));
 const ChartsPage = lazy(() => import('./pages/stats/ChartsPage'));
 const UserAchievementsPage = lazy(() => import('./pages/achievements/AchievementList'));
 const BigPicturePage = lazy(() => import('./pages/bigpicture/BigPicturePage'));
+const NetworkPage = lazy(() => import('./pages/network/NetworkPage'));
 const OverlayPage = lazy(() => import('./desktop/OverlayPage'));
 const ScreenshotsPage = lazy(() => import('./desktop/ScreenshotsPage'));
 
@@ -115,6 +116,7 @@ export default function App() {
             <Route path="/discover" element={<RequireAuth><DiscoveryPage /></RequireAuth>} />
             <Route path="/wishlist" element={<RequireAuth><WishlistPage /></RequireAuth>} />
             <Route path="/library" element={<RequireAuth><LibraryPage /></RequireAuth>} />
+            <Route path="/network" element={authed(<NetworkPage />)} />
             <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
             {isDesktop && <Route path="/downloads" element={<RequireAuth><DownloadsPage /></RequireAuth>} />}
             {isDesktop && <Route path="/client-settings" element={<ClientSettingsPage />} />}

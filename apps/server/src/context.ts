@@ -17,6 +17,7 @@ import type { PresenceService } from './services/social.js';
 import type { ChatService } from './services/chat.js';
 import type { AchievementService } from './services/achievements.js';
 import type { CardService } from './services/cards.js';
+import type { FederationService } from './services/federation.js';
 
 export interface AppContext {
   config: Config;
@@ -38,6 +39,7 @@ export interface AppContext {
   chat: ChatService;
   achievements: AchievementService;
   cards: CardService;
+  federation: FederationService;
 }
 
 export interface AuthInfo {

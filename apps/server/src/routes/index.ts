@@ -25,6 +25,7 @@ import { giftRoutes } from './gifts.js';
 import { playRoutes, sdkRoutes } from './sdk.js';
 import { statsRoutes } from './stats.js';
 import { workshopRoutes } from './workshop.js';
+import { federationRoutes } from './federation.js';
 
 export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(systemRoutes);
@@ -56,5 +57,7 @@ export const registerRoutes: FastifyPluginAsync = async (app) => {
   await app.register(giftRoutes);
   await app.register(statsRoutes, { prefix: '/stats' });
   await app.register(deviceRoutes);
+  // Föderation (Stufe 1) – Netzwerk aus mehreren Servern
+  await app.register(federationRoutes);
   app.get('/openapi.json', { schema: { hide: true }, config: { allowInMaintenance: true } }, async () => app.swagger());
 };

@@ -1255,3 +1255,30 @@ model GameNote {
 
   @@id([userId, gameId])
 }
+
+// ---------------------------------------------------------------------------
+// Föderation (Stufe 1): mehrere Server zu einem Netzwerk verbinden.
+// Spiele bleiben auf ihrem Herkunftsserver; verbundene Server zeigen den
+// Katalog und liefern Downloads per signierter, direkter Datei-URL aus.
+// ---------------------------------------------------------------------------
+
+enum FederationStatus {
+  PENDING // ausgehend angefragt, vom Peer noch nicht bestätigt
+  ACTIVE
+  BLOCKED
+}
+
+model FederatedServer {
+  id           String           @id @default(cuid())
+  name         String // Anzeigename, vom Peer gemeldet
+  baseUrl      String           @unique // z. B. https://games.example.com (ohne abschließenden /)
+  publicKey    String // Ed25519-Public-Key des Peers (base64, SPKI/PEM)
+  status       FederationStatus @default(ACTIVE)
+  lastSyncedAt DateTime?
+  lastError    String?
+  catalog      Json             @default("[]") // zwischengespeicherter Remote-Katalog (RemoteGameDto[])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([status])
+}

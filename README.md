@@ -379,6 +379,28 @@ auf Updates, zeigt eine Hinweisleiste mit Knopf und installiert signierte Update
 
 ---
 
+## Server-Verbund (Föderation)
+
+Mehrere Server lassen sich zu einem **Netzwerk** verbinden. Ein Spiel liegt nur auf seinem
+Herkunftsserver, ist aber von allen verbundenen Servern aus sichtbar und herunterladbar – die
+Bytes kommen dabei direkt vom Herkunftsserver (keine doppelte Bandbreite).
+
+**Verbinden (zwei Admins):**
+
+1. Admin A öffnet **Verwaltung → Netzwerk** und erzeugt einen **Pairing-Code**.
+2. Admin A gibt Admin B die **Server-Adresse** von A und den **Code** (Code ist 15 Minuten gültig).
+3. Admin B öffnet **Verwaltung → Netzwerk**, trägt unter „Mit einem anderen Server verbinden"
+   A's Adresse + Code ein und klickt **Verbinden**. Beide Server vertrauen sich nun gegenseitig.
+
+Danach erscheinen die öffentlichen Spiele des jeweils anderen Servers unter **Netzwerk** (im
+Nutzermenü). Downloads einzelner Dateien laufen direkt; Ordner-Builds am besten über den Desktop-Client.
+
+**Technik:** Jeder Server hat ein Ed25519-Schlüsselpaar; Server-zu-Server-Anfragen sind signiert.
+Nur Spiele mit Sichtbarkeit **PUBLIC** werden geteilt. Die eigene Adresse ist `PUBLIC_URL`.
+(Geplant: geteilte Accounts und gemeinsamer Chat über Server hinweg.)
+
+---
+
 ## Spiele hochladen – Ablauf
 
 1. **Verwaltung → Spiele → Neues Spiel** – Titel eingeben.

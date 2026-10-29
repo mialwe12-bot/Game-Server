@@ -88,4 +88,25 @@ export class SettingsService {
     const again = await this.db.setting.findUnique({ where: { key: 'internal.appSecret' } });
     return String(again?.value ?? secret);
   }
+
+  /** Ed25519-Schlüsselpaar dieses Servers für die Föderation (einmalig erzeugt und gespeichert, PEM). */
+  async federationKeys(): Promise<{ publicKey: string; privateKey: string }> {
+    const pubRow = await this.db.setting.findUnique({ where: { key: 'internal.federationPublicKey' } });
+    const privRow = await this.db.setting.findUnique({ where: { key: 'internal.federationPrivateKey' } });
+    if (pubRow && privRow && typeof pubRow.value === 'string' && typeof privRow.value === 'string') {
+      return { publicKey: pubRow.value, privateKey: privRow.value };
+    }
+    const { generateKeyPairSync } = await import('node:crypto');
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519', {
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    await this.db.$transaction([
+      this.db.setting.upsert({ where: { key: 'internal.federationPublicKey' }, create: { key: 'internal.federationPublicKey', value: publicKey }, update: {} }),
+      this.db.setting.upsert({ where: { key: 'internal.federationPrivateKey' }, create: { key: 'internal.federationPrivateKey', value: privateKey }, update: {} }),
+    ]);
+    const pub = await this.db.setting.findUnique({ where: { key: 'internal.federationPublicKey' } });
+    const priv = await this.db.setting.findUnique({ where: { key: 'internal.federationPrivateKey' } });
+    return { publicKey: String(pub?.value ?? publicKey), privateKey: String(priv?.value ?? privateKey) };
+  }
 }

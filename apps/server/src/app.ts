@@ -37,6 +37,7 @@ import { PresenceService } from './services/social.js';
 import { ChatService } from './services/chat.js';
 import { AchievementService } from './services/achievements.js';
 import { CardService } from './services/cards.js';
+import { FederationService } from './services/federation.js';
 import { startEventReminders } from './services/groups.js';
 
 // BigInt (Dateigrößen) sicher als Zahl serialisieren.
@@ -84,6 +85,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   ctx.achievements = new AchievementService(ctx);
   ctx.cards = new CardService(ctx);
   ctx.signer = new UrlSigner(await ctx.settings.appSecret(config.APP_SECRET));
+  ctx.federation = new FederationService(ctx);
+  await ctx.federation.init();
   ctx.presence.start();
   app.decorate('ctx', ctx);
   await ctx.storage.init();
@@ -193,12 +196,14 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   await ctx.backups.recover();
   if (opts.jobs) {
     ctx.backups.startScheduler();
+    ctx.federation.start();
     const cleanup = setInterval(() => void ctx.uploads.cleanupStale().catch(() => undefined), 3600_000);
     cleanup.unref();
     const reminders = startEventReminders(ctx);
     app.addHook('onClose', async () => {
       clearInterval(cleanup);
       clearInterval(reminders);
+      ctx.federation.stop();
     });
   }
 

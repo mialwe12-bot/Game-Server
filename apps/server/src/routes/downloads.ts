@@ -76,18 +76,33 @@ export const downloadRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ['downloads'],
         summary: 'Datei herunterladen (unterstützt HTTP Range)',
         params: z.object({ buildId: z.string(), fileId: z.string() }),
+        // Signierte Föderations-URLs (exp/sig) erlauben den Zugriff auch ohne Login (nur öffentliche Builds).
+        querystring: z.object({ exp: z.string().optional(), sig: z.string().optional() }),
       },
       config: { rateLimit: false },
     },
     async (req, reply) => {
-      const { user } = requireAuth(req);
-      const build = await loadDownloadableBuild(ctx, user, req.params.buildId);
-      const file = await ctx.db.buildFile.findFirst({ where: { id: req.params.fileId, buildId: build.id } });
+      const { buildId, fileId } = req.params;
+      const signedPath = `/api/builds/${buildId}/files/${fileId}`;
+      const signed = Boolean(req.query.sig) && ctx.signer.verify(signedPath, req.query.exp, req.query.sig);
+      let userId: string | null = null;
+      let build: Awaited<ReturnType<typeof loadDownloadableBuild>>;
+      if (signed) {
+        const found = await ctx.db.build.findUnique({ where: { id: buildId }, include: { version: { include: { game: true } }, _count: { select: { files: true } } } });
+        // Föderierte Links gelten ausschließlich für öffentliche, veröffentlichte Builds
+        if (!found || found.version.game.visibility !== 'PUBLIC' || !found.version.published || found.status !== 'READY') throw notFound('Datei nicht gefunden');
+        build = found;
+      } else {
+        const auth = requireAuth(req);
+        userId = auth.user.id;
+        build = await loadDownloadableBuild(ctx, auth.user, buildId);
+      }
+      const file = await ctx.db.buildFile.findFirst({ where: { id: fileId, buildId: build.id } });
       if (!file) throw notFound('Datei nicht gefunden');
       const settings = await ctx.settings.get();
       const rangeStart = /^bytes=(\d+)-/.exec(req.headers.range ?? '')?.[1];
-      if (req.method === 'GET' && (!rangeStart || rangeStart === '0')) {
-        await recordDownload(user.id, build.version.gameId, build.id);
+      if (userId && req.method === 'GET' && (!rangeStart || rangeStart === '0')) {
+        await recordDownload(userId, build.version.gameId, build.id);
       }
       return sendFile(req, reply, {
         filePath: ctx.storage.resolve(file.storageKey),
