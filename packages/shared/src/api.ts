@@ -32,6 +32,7 @@ import type {
   ServerLogLine,
   SessionInfo,
   StorageOverview,
+  ServerUpdateStatus,
   StoreFacets,
   StoreHome,
   StoreSearchQuery,
@@ -303,7 +304,9 @@ export class ApiClient {
       headers,
       body,
       signal: opts.signal,
-      credentials: this.token ? 'omit' : 'include',
+      // Cookies nur same-origin (Browser ohne baseUrl). Desktop-Client spricht eine eigene Server-Adresse an
+      // (cross-origin) und nutzt immer das Device-Token – dort würde 'include' ohne Allow-Credentials an CORS scheitern.
+      credentials: this.baseUrl || this.token ? 'omit' : 'include',
     });
     if (!res.ok) {
       let err: ApiErrorBody = { error: 'http_error', message: res.statusText };
@@ -498,6 +501,14 @@ export class ApiClient {
     settings: () => this.get<AdminSettings>('/admin/settings'),
     updateSettings: (data: Partial<AdminSettings>) => this.patch<AdminSettings>('/admin/settings', data),
     testMail: () => this.post<{ ok: true }>('/admin/settings/test-mail'),
+    uploadLogo: (kind: 'logo' | 'client-logo', file: Blob) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return this.request<AdminSettings>('POST', `/admin/branding/${kind}`, { body: fd });
+    },
+    removeLogo: (kind: 'logo' | 'client-logo') => this.del<AdminSettings>(`/admin/branding/${kind}`),
+    checkUpdate: () => this.get<ServerUpdateStatus>('/admin/update/check'),
+    applyUpdate: () => this.post<{ started: boolean }>('/admin/update/apply'),
     announcements: () => this.get<AnnouncementDto[]>('/admin/announcements'),
     createAnnouncement: (data: { title: string; body: string; published?: boolean; pinned?: boolean; gameId?: string | null }) =>
       this.post<AnnouncementDto>('/admin/announcements', data),

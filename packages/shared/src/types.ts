@@ -104,6 +104,10 @@ export interface PublicSettings {
   };
   /** Discord-Application-ID für Rich Presence im Desktop-Client (leer = aus) */
   discordAppId: string;
+  /** Branding: Logo (Web), Client-Logo und eigenes CSS; leer = Standard */
+  logoUrl: string;
+  clientLogoUrl: string;
+  customCss: string;
 }
 
 export interface BackupSchedule {
@@ -145,6 +149,13 @@ export interface AdminSettings {
   /** Minuten Spielzeit pro Karten-Drop */
   cardDropMinutes: number;
   discordAppId: string;
+  // Branding
+  /** Logo im Web-Header/Login (Pfad unter /api/branding, leer = Name als Text) */
+  logoUrl: string;
+  /** Logo im Desktop-Client (Login/Einrichtung) */
+  clientLogoUrl: string;
+  /** Eigenes CSS, wird in Web und Client eingebunden */
+  customCss: string;
 }
 
 export interface GenreDto {
@@ -500,4 +511,21 @@ export interface ClientReleaseDto {
   publishedAt: string | null;
   createdAt: string;
   files: ClientReleaseFileDto[];
+}
+
+/** Serverseitige Update-Prüfung (Admin). */
+export interface ServerUpdateStatus {
+  /** Laufende Version */
+  current: string;
+  /** Neueste gefundene Version (null = keine Prüfung möglich/konfiguriert) */
+  latest: string | null;
+  updateAvailable: boolean;
+  /** Versionsprüfung aktiviert (UPDATE_CHECK_URL gesetzt) */
+  checkEnabled: boolean;
+  /** Update kann per Knopfdruck angewendet werden (UPDATE_COMMAND gesetzt) */
+  canApply: boolean;
+  /** Fehler bei der Prüfung (z. B. Quelle nicht erreichbar) */
+  error?: string;
+  /** Manueller Befehl, wenn kein Ein-Klick-Update eingerichtet ist */
+  manualCommand?: string;
 }

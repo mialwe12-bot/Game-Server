@@ -9,6 +9,7 @@ import { DesktopProvider } from './desktop/DesktopProvider';
 import './i18n';
 import './index.css';
 import { api } from './lib/api';
+import { CustomCssInjector } from './components/Branding';
 import { AuthProvider } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 
@@ -42,6 +43,7 @@ async function bootstrap() {
           <Router>
             {withDesktop(
               <AuthProvider>
+                <CustomCssInjector />
                 <App />
               </AuthProvider>,
             )}

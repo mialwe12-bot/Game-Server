@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Field, Input } from '../components/ui';
-import { api } from '../lib/api';
+import { api, setApiSession } from '../lib/api';
+import { BrandLogo } from '../components/Branding';
 import { desktop, desktopError } from './bridge';
 
 export default function ServerSetupPage({ onConnected }: { onConnected?: () => void }) {
@@ -24,10 +25,11 @@ export default function ServerSetupPage({ onConnected }: { onConnected?: () => v
     try {
       await desktop.testServer(normalized);
       // Neuer Server → alte Sitzung verwerfen
-      await desktop.setSession(normalized, normalized === api.baseUrl ? api.token : null);
-      if (normalized !== api.baseUrl) api.token = null;
-      api.baseUrl = normalized;
+      const keepToken = normalized === api.baseUrl ? api.token : null;
+      await desktop.setSession(normalized, keepToken);
       qc.clear();
+      // Server-Adresse/Token setzen und Beobachter benachrichtigen (Queries laden neu)
+      setApiSession({ baseUrl: normalized, token: keepToken });
       onConnected?.();
       navigate('/login', { replace: true });
     } catch (err) {
@@ -41,7 +43,7 @@ export default function ServerSetupPage({ onConnected }: { onConnected?: () => v
     <div className="flex min-h-screen items-center justify-center bg-bg p-4">
       <form onSubmit={connect} className="w-full max-w-md space-y-5 rounded-lg border border-border bg-surface p-8 shadow-xl">
         <div className="flex items-center gap-3">
-          <img src="/favicon.svg" alt="" className="size-10" />
+          <BrandLogo client className="size-10 rounded" />
           <h1 className="text-xl font-bold">{t('desktop.setupTitle')}</h1>
         </div>
         <p className="text-sm text-muted">{t('desktop.setupText')}</p>

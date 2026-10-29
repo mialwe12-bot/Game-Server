@@ -3,12 +3,14 @@ import { Activity, BarChart3, Camera, Cloud, Gamepad2, Gift, Home, Layers, Packa
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { ClientUpdateBanner } from '../desktop/ClientUpdateBanner';
 import { isDesktop } from '../desktop/bridge';
 import { activeDownloads, useDesktop } from '../desktop/DesktopProvider';
 import { LANGUAGES } from '../i18n';
 import { useAuth } from '../lib/auth';
 import { useTheme, type ThemeMode } from '../lib/theme';
 import { dismiss, useToasts } from '../lib/toast';
+import { BrandLogo } from './Branding';
 import { Avatar } from './Avatar';
 import { Markdown } from './Markdown';
 import { ChatNavButton, NotificationBell } from './Social';
@@ -297,13 +299,14 @@ export function Layout() {
           {t('maintenance.banner')}: {settings.maintenanceMessage}
         </div>
       )}
+      {isDesktop && <ClientUpdateBanner />}
       <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
           <button type="button" className="rounded p-1 xl:hidden" onClick={() => setMobileOpen((o) => !o)} aria-label={t('nav.menu')}>
             {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
           </button>
           <Link to="/" className="flex items-center gap-2 font-bold tracking-wide">
-            <img src="/favicon.svg" alt="" className="size-7" />
+            <BrandLogo className="size-7 rounded" />
             <span className="hidden whitespace-nowrap sm:inline">{settings?.siteName ?? 'Game Server'}</span>
           </Link>
           <nav className="hidden items-center gap-1 xl:flex">{navItems(true)}</nav>

@@ -270,8 +270,12 @@ describe('Sammelkarten, Abzeichen, Tausch, Marktplatz', () => {
 
     // Marktplatz: Bob bietet eine Karte an und sucht die Karte, die Carol besitzt
     const bobNow = (await bob.req('GET', '/api/cards/inventory')).json().items;
-    const carolNow = (await carol.req('GET', '/api/cards/inventory')).json().items;
-    const wantCardId = carolNow.find((i: { card: { id: string } }) => i.card.id !== bobNow[0].card.id)?.card.id ?? carolNow[0].card.id;
+    // Gesuchte Karte deterministisch wählen (≠ angebotene Karte) und sicherstellen, dass Carol sie besitzt – sonst Flake je nach Zufalls-Drops
+    const wantCard = cards.find((c: { id: string }) => c.id !== bobNow[0].card.id)!;
+    if (!(await carol.req('GET', '/api/cards/inventory')).json().items.some((i: { card: { id: string } }) => i.card.id === wantCard.id)) {
+      await db.cardItem.create({ data: { ownerId: carol.userId, cardId: wantCard.id, source: 'admin' } });
+    }
+    const wantCardId = wantCard.id;
     const listing = (await bob.req('POST', '/api/cards/market', { itemId: bobNow[0].id, wantCardId })).json();
     const market = (await carol.req('GET', '/api/cards/market?fulfillable=true')).json();
     expect(market.map((l: { id: string }) => l.id)).toContain(listing.id);

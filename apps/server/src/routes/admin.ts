@@ -1,7 +1,8 @@
+import { spawn } from 'node:child_process';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import type { AdminUserDto, AuditLogDto, InviteDto, Paginated, StorageOverview } from '@gameserver/shared';
+import type { AdminUserDto, AuditLogDto, InviteDto, Paginated, ServerUpdateStatus, StorageOverview } from '@gameserver/shared';
 import { readableCode } from '../lib/crypto.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import { hashPassword } from '../lib/password.js';
@@ -9,6 +10,7 @@ import { sendFile } from '../lib/send.js';
 import { iso } from '../lib/time.js';
 import { requireAdmin } from '../plugins/auth.js';
 import { announcementDto, announcementInclude, userPublic } from '../services/dto.js';
+import { saveImageUpload } from '../lib/image-upload.js';
 import { passwordSchema, usernameSchema } from './auth.js';
 
 const pageQuery = {
@@ -308,6 +310,10 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
             giftsEnabled: z.boolean(),
             cardDropMinutes: z.number().int().min(1).max(24 * 60),
             discordAppId: z.string().trim().regex(/^\d*$/).max(32),
+            // Branding: Logos nur als interne /api/branding-Pfade (per Upload gesetzt) oder leer (löschen)
+            logoUrl: z.string().max(300).regex(/^(|\/api\/branding\/[\w.-]+)$/, 'Nur per Upload setzbar'),
+            clientLogoUrl: z.string().max(300).regex(/^(|\/api\/branding\/[\w.-]+)$/, 'Nur per Upload setzbar'),
+            customCss: z.string().max(40_000),
           })
           .partial(),
       },
@@ -334,6 +340,98 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
       return { ok: true };
     },
   );
+
+  // ---- Updates ----
+  const MANUAL_UPDATE_CMD = 'sudo bash /opt/gameserver/deploy/install.sh';
+
+  /** "0.4.0"/"v0.4.0-rc1" → [0,4,0]; für Vergleiche. */
+  const parseVersion = (v: string): number[] =>
+    v
+      .trim()
+      .replace(/^v/i, '')
+      .split(/[.\-+]/)
+      .slice(0, 3)
+      .map((x) => Number.parseInt(x, 10) || 0);
+  const isNewer = (a: string, b: string): boolean => {
+    const [pa, pb] = [parseVersion(a), parseVersion(b)];
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+    }
+    return false;
+  };
+
+  /** Neueste Version aus der Update-Quelle lesen (GitHub-Tags/Releases-Array oder Objekt mit version/tag_name). */
+  async function fetchLatestVersion(url: string): Promise<string | null> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'GameServer' }, signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: unknown = await res.json();
+      const pick = (o: unknown): string | null => {
+        if (o && typeof o === 'object') {
+          const r = o as Record<string, unknown>;
+          const v = r.version ?? r.tag_name ?? r.name;
+          return typeof v === 'string' ? v : null;
+        }
+        return null;
+      };
+      if (Array.isArray(data)) {
+        const versions = data.map(pick).filter((v): v is string => !!v);
+        return versions.reduce<string | null>((best, v) => (!best || isNewer(v, best) ? v : best), null);
+      }
+      return pick(data);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  app.get('/update/check', { schema: { tags: ['admin'], summary: 'Nach Server-Updates suchen' }, config: { allowInMaintenance: true } }, async (): Promise<ServerUpdateStatus> => {
+    const current = ctx.config.version;
+    const checkEnabled = !!ctx.config.UPDATE_CHECK_URL;
+    const canApply = !!ctx.config.UPDATE_COMMAND;
+    const base: ServerUpdateStatus = { current, latest: null, updateAvailable: false, checkEnabled, canApply, manualCommand: canApply ? undefined : MANUAL_UPDATE_CMD };
+    if (!checkEnabled) return base;
+    try {
+      const latest = await fetchLatestVersion(ctx.config.UPDATE_CHECK_URL);
+      return { ...base, latest, updateAvailable: !!latest && isNewer(latest, current) };
+    } catch (err) {
+      return { ...base, error: err instanceof Error ? err.message : 'Prüfung fehlgeschlagen' };
+    }
+  });
+
+  app.post('/update/apply', { schema: { tags: ['admin'], summary: 'Server-Update anwenden (nur mit eingerichtetem UPDATE_COMMAND)' } }, async (req) => {
+    if (!ctx.config.UPDATE_COMMAND) {
+      throw badRequest(`Kein Ein-Klick-Update eingerichtet. Update manuell ausführen: ${MANUAL_UPDATE_CMD}`, 'update_not_configured');
+    }
+    await ctx.audit.log({ userId: req.auth!.user.id, action: 'admin.update_applied', ip: req.ip });
+    // Losgelöst starten – der Befehl baut/startet den Server neu und beendet damit diesen Prozess.
+    const child = spawn('sh', ['-c', ctx.config.UPDATE_COMMAND], { detached: true, stdio: 'ignore' });
+    child.unref();
+    return { started: true };
+  });
+
+  // ---- Branding (Logo-Upload) ----
+  const brandingKind = z.object({ kind: z.enum(['logo', 'client-logo']) });
+  const brandingField = (kind: 'logo' | 'client-logo') => (kind === 'logo' ? 'logoUrl' : 'clientLogoUrl') as 'logoUrl' | 'clientLogoUrl';
+
+  app.post('/branding/:kind', { schema: { tags: ['admin'], summary: 'Logo hochladen (max. 1 MB)', params: brandingKind } }, async (req) => {
+    const field = brandingField(req.params.kind);
+    const saved = await saveImageUpload(req, ctx.storage, 'branding', 1024 ** 2);
+    const prev = (await ctx.settings.get())[field];
+    const updated = await ctx.settings.update({ [field]: `/api/branding/${saved.key.split('/').pop()}` });
+    // Altes Logo entfernen
+    if (prev.startsWith('/api/branding/')) await ctx.storage.remove(`branding/${prev.split('/').pop()}`).catch(() => undefined);
+    await ctx.audit.log({ userId: req.auth!.user.id, action: 'admin.branding_updated', meta: { kind: req.params.kind }, ip: req.ip });
+    return updated;
+  });
+
+  app.delete('/branding/:kind', { schema: { tags: ['admin'], summary: 'Logo entfernen', params: brandingKind } }, async (req) => {
+    const field = brandingField(req.params.kind);
+    const prev = (await ctx.settings.get())[field];
+    if (prev.startsWith('/api/branding/')) await ctx.storage.remove(`branding/${prev.split('/').pop()}`).catch(() => undefined);
+    return ctx.settings.update({ [field]: '' });
+  });
 
   // ---- Ankündigungen ----
 

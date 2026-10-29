@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { PublicSettings } from '@gameserver/shared';
 import { notFound } from '../lib/errors.js';
 import { sendFile } from '../lib/send.js';
+import { sendStoredFile } from '../lib/image-upload.js';
 import { canEditGame, canViewGame } from '../services/access.js';
 import { userPublic } from '../services/dto.js';
 
@@ -43,8 +44,18 @@ export const systemRoutes: FastifyPluginAsyncZod = async (app) => {
           gifts: s.giftsEnabled,
         },
         discordAppId: s.discordAppId,
+        logoUrl: s.logoUrl,
+        clientLogoUrl: s.clientLogoUrl,
+        customCss: s.customCss,
       };
     },
+  );
+
+  // Öffentliches Branding-Logo (ohne Signatur, cachebar – Dateiname ist eindeutig)
+  app.get(
+    '/branding/:file',
+    { schema: { tags: ['system'], summary: 'Branding-Logo', params: z.object({ file: z.string().regex(/^[\w.-]+$/) }) }, config: { allowInMaintenance: true, rateLimit: false } },
+    async (req, reply) => sendStoredFile(req, reply, ctx.storage, `branding/${req.params.file}`),
   );
 
   app.get(

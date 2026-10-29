@@ -346,6 +346,23 @@ max. Bildgröße im Chat, Cloud-Saves inkl. Versionen/Kontingent, Workshop inkl.
 Geschenke, Karten-Drop-Intervall, Discord-Anwendungs-ID) werden im
 Admin-Panel unter **Verwaltung → Einstellungen** gesetzt und in der Datenbank gespeichert.
 
+### Branding
+
+Unter **Verwaltung → Einstellungen → Branding** lassen sich der **angezeigte Name**, ein **Logo** (Web-Kopf und
+Anmeldeseite), ein **Client-Logo** (Desktop-Client) und **eigenes CSS** festlegen. Das CSS wird in Web und Client
+eingebunden und kann die Design-Variablen überschreiben, z. B. `:root { --accent: #e4572e; }`. Logos werden auf dem Server
+gespeichert und unter `/api/branding/…` ausgeliefert.
+
+### Updates
+
+Unter **Verwaltung → Einstellungen → Updates** zeigt das Panel die laufende Version und prüft auf Knopfdruck, ob eine
+neuere verfügbar ist (Quelle: `UPDATE_CHECK_URL`, Standard sind die offiziellen Releases dieses Projekts – es wird nur die
+Versionsnummer abgefragt). Das eigentliche Update läuft auf dem Host: am einfachsten `sudo bash /opt/gameserver/deploy/install.sh`
+erneut ausführen (siehe Schnellstart). Wer ein **Ein-Klick-Update** im Panel möchte, hinterlegt in `UPDATE_COMMAND` einen Befehl,
+der den Server tatsächlich aktualisiert (z. B. ein Host-Watcher oder ein Skript mit Docker-Zugriff) – ohne diesen Befehl zeigt
+das Panel nur den manuellen Befehl an. Der **Desktop-Client** aktualisiert sich selbst (siehe Client-README): er prüft beim Start
+auf Updates, zeigt eine Hinweisleiste mit Knopf und installiert signierte Updates auf Wunsch automatisch.
+
 ---
 
 ## Spiele hochladen – Ablauf

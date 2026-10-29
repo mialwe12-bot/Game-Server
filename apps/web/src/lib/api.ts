@@ -13,6 +13,22 @@ export const api = new ApiClient({
   token: window.__GS_TOKEN__ ?? null,
 });
 
+/** Beobachter für Sitzungswechsel (Server-Adresse/Token) im Desktop-Client. */
+const sessionListeners = new Set<() => void>();
+
+/** Auf Änderungen von Server-Adresse/Token reagieren (für erneutes Laden + WebSocket-Neuverbindung). */
+export function onApiSessionChange(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => void sessionListeners.delete(listener);
+}
+
+/** Server-Adresse und/oder Token setzen und alle Beobachter benachrichtigen. */
+export function setApiSession(opts: { baseUrl?: string; token?: string | null }): void {
+  if (opts.baseUrl !== undefined) api.baseUrl = opts.baseUrl;
+  if (opts.token !== undefined) api.token = opts.token;
+  for (const l of sessionListeners) l();
+}
+
 export function errorMessage(err: unknown, fallback = 'Fehler'): string {
   if (err instanceof ApiError) return err.message;
   if (err instanceof TypeError) return 'Server nicht erreichbar';

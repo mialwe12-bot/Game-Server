@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react';
+import { BrandLogo } from '../../components/Branding';
 
 export function AuthCard({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
   return (
     <div className="mx-auto mt-8 max-w-md">
       <div className="rounded-lg border border-border bg-surface p-6 shadow-sm sm:p-8">
-        <h1 className="mb-6 text-2xl font-bold">{title}</h1>
+        <div className="mb-6 flex items-center gap-3">
+          <BrandLogo client className="size-9 rounded" />
+          <h1 className="text-2xl font-bold">{title}</h1>
+        </div>
         {children}
       </div>
       {footer && <div className="mt-4 text-center text-sm text-muted">{footer}</div>}

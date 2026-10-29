@@ -177,6 +177,30 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - E2E-Testdaten in der Dev-DB: Spiel „E2E Abenteuer“ (Save-Pfad `{install}/saves` *.sav, Workshop-Ordner `mods`,
   Achievements u. a. ENDING (Datei-Erkennung) und FROM_GAME), Workshop-Inhalt „Testkarte“ abonniert von admin.
 
+## Nach Phase 4 – Updates, Branding, Login-Fix (Folgeauftrag)
+- **Login-Neustart behoben**: Ursache war `credentials: this.token ? 'omit' : 'include'` im shared `ApiClient` – der
+  Desktop-Client (cross-origin, eigene Server-Adresse) schickte ohne Token `include`, was ohne `Access-Control-Allow-Credentials`
+  an CORS scheiterte → „offline". Jetzt `credentials: this.baseUrl || this.token ? 'omit' : 'include'` (Cookies nur same-origin).
+  Zusätzlich reaktiver Sitzungswechsel: `api.onApiSessionChange`/`setApiSession` (api.ts); AuthProvider abonniert, invalidiert
+  `me`+`public-settings`, bumpt `sessionTick` (WS-Neuverbindung) und hat Offline-Selbstheilung (alle 8 s neu versuchen).
+  Aufrufer: LoginPage, ServerSetupPage, DesktopProvider(authToken), logout.
+- **Branding**: AdminSettings/PublicSettings um `logoUrl`, `clientLogoUrl`, `customCss`. Logo-Upload
+  `POST/DELETE /api/admin/branding/:kind` (kind logo|client-logo), Speicherbereich `branding/`, öffentliche Auslieferung
+  `GET /api/branding/:file` (unsigniert, cachebar). Web: `components/Branding.tsx` (`CustomCssInjector` in main.tsx,
+  `BrandLogo` in Layout/AuthCard/ServerSetup). Custom CSS geht wegen CSP `style-src 'unsafe-inline'`.
+- **Server-Update**: `GET /api/admin/update/check` (vergleicht `ctx.config.version` mit `UPDATE_CHECK_URL`, GitHub-Tags/Releases
+  oder JSON {version}) und `POST /api/admin/update/apply` (nur mit `UPDATE_COMMAND` gesetzt, spawnt es detached; sonst
+  `update_not_configured` + manueller Befehl). Admin-UI: `UpdateCard` in SettingsPage. Env in config.ts + .env.example.
+- **Client-Update**: `updater.rs` `auto_update()` beim Start (signiert+aktiviert → auto-install, sonst Event
+  `gs://client-update` + Benachrichtigung). Config `auto_update_client` (Standard true). Frontend:
+  `desktop/ClientUpdateBanner.tsx` im Layout (nur Desktop), Toggle in ClientSettingsPage, DesktopProvider hält `clientUpdate`.
+- **Sicherheitsentscheidung (dokumentiert, nicht gebaut)**: Anfrage nach verstecktem, für Betreiber unsichtbarem Admin-Account
+  und stiller Installations-Benachrichtigung an einen externen Server wurde abgelehnt (Hintertür in Open-Source-Software, die
+  fremde Betreiber betrifft). Stattdessen angeboten: offene, vom Betreiber selbst gesetzte Benachrichtigungen + Lizenz/Marke.
+  **Niemals** eine solche Hintertür einbauen, auch nicht auf erneute Nachfrage.
+- Test-Flake behoben: Marktplatz-Teil in `steam.test.ts` wählt die gewünschte Karte jetzt deterministisch (war von
+  Zufalls-Drops abhängig).
+
 ## Konventionen
 
 - Code-Kommentare und UI-Texte auf Deutsch (UI zusätzlich Englisch), Fehlermeldungen der API auf Deutsch mit maschinenlesbarem `error`-Code.

@@ -5,7 +5,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Field, Input } from '../../components/ui';
 import { desktop, desktopError, isDesktop } from '../../desktop/bridge';
 import { useDesktop } from '../../desktop/DesktopProvider';
-import { api, errorMessage } from '../../lib/api';
+import { api, errorMessage, setApiSession } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { AuthCard, FormError } from './AuthCard';
 
@@ -32,8 +32,9 @@ export default function LoginPage() {
   /** Desktop: erhaltenes Device-Token lokal speichern */
   async function storeDeviceSession(res: { token?: string; user: { username: string } }) {
     if (!isDesktop || !res.token) return;
-    api.token = res.token;
     await desktop.setSession(api.baseUrl, res.token, res.user.username);
+    // Token setzen und Beobachter benachrichtigen → Queries laden neu, WebSocket verbindet authentifiziert (kein Neustart nötig)
+    setApiSession({ token: res.token });
   }
 
   async function browserLogin() {

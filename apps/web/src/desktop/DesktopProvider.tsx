@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DESKTOP_EVENTS, type CloudSyncResult, type DesktopConfig, type DownloadJob, type InstalledGame, type LocalScreenshot, type ParentalTick, type PlatformInfo, type RunningGame } from '@gameserver/shared';
+import { DESKTOP_EVENTS, type ClientUpdateInfo, type CloudSyncResult, type DesktopConfig, type DownloadJob, type InstalledGame, type LocalScreenshot, type ParentalTick, type PlatformInfo, type RunningGame } from '@gameserver/shared';
 import i18n from '../i18n';
 import { CloudConflictDialog } from './CloudConflictDialog';
-import { api } from '../lib/api';
+import { api, setApiSession } from '../lib/api';
 import { useWsEvent } from '../lib/events';
 import { toast } from '../lib/toast';
 import { desktop, desktopError, isDesktop, isOverlayWindow } from './bridge';
@@ -20,6 +20,9 @@ interface DesktopState {
   reload: () => Promise<void>;
   /** Spiel starten mit Fehlermeldung als Toast */
   play: (gameId: string) => Promise<void>;
+  /** Verfügbares Client-Update (null = keines) */
+  clientUpdate: ClientUpdateInfo | null;
+  dismissClientUpdate: () => void;
 }
 
 const Ctx = createContext<DesktopState | null>(null);
@@ -33,6 +36,7 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
   const [installed, setInstalled] = useState<InstalledGame[]>([]);
   const [downloads, setDownloads] = useState<DownloadJob[]>([]);
   const [running, setRunning] = useState<Set<string>>(new Set());
+  const [clientUpdate, setClientUpdate] = useState<ClientUpdateInfo | null>(null);
   const installedRef = useRef(installed);
   installedRef.current = installed;
 
@@ -81,8 +85,9 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
       desktop.on<RunningGame[]>(DESKTOP_EVENTS.running, (r) => setRunning(new Set(r.map((x) => x.gameId)))),
       desktop.on<{ token: string; username: string | null }>(DESKTOP_EVENTS.authToken, async ({ token, username }) => {
         const cfg = await desktop.setSession(api.baseUrl, token, username);
-        api.token = token;
         setConfig(cfg);
+        // Token setzen und Beobachter benachrichtigen (WebSocket verbindet authentifiziert, Queries laden neu)
+        setApiSession({ token });
         await qc.invalidateQueries();
         navigate('/', { replace: true });
       }),
@@ -107,7 +112,22 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
         if (p.remainingSeconds > 0) toast.info(i18n.t('family.parentalWarning', { minutes: Math.ceil(p.remainingSeconds / 60) }));
         else toast.error(i18n.t('family.parentalStopped'));
       }),
+      // Client-Update (vom Rust-Start-Check gemeldet) → Banner anzeigen
+      desktop.on<ClientUpdateInfo>(DESKTOP_EVENTS.clientUpdate, (info) => {
+        if (isOverlayWindow) return;
+        if (info.available) {
+          setClientUpdate(info);
+          toast.info(i18n.t('desktop.clientUpdateAvailable', { version: info.version ?? '' }));
+        }
+      }),
     ];
+    // Bereits angemeldet: einmalig auf Client-Update prüfen (deckt Neustart ohne Rust-Event ab)
+    if (!isOverlayWindow && api.token) {
+      void desktop
+        .checkClientUpdate()
+        .then((info) => info.available && setClientUpdate(info))
+        .catch(() => undefined);
+    }
     // Start über Verknüpfung, der beim Hochfahren nicht direkt gelang
     if (!isOverlayWindow) {
       void desktop.takeLaunchRequest().then((id) => {
@@ -182,8 +202,10 @@ export function DesktopProvider({ initialConfig, children }: { initialConfig: De
       updateConfig,
       reload,
       play,
+      clientUpdate,
+      dismissClientUpdate: () => setClientUpdate(null),
     }),
-    [config, platform, installed, downloads, running, updateConfig, reload, play],
+    [config, platform, installed, downloads, running, updateConfig, reload, play, clientUpdate],
   );
   return (
     <Ctx.Provider value={value}>

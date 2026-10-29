@@ -27,6 +27,9 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   giftsEnabled: true,
   cardDropMinutes: 30,
   discordAppId: '',
+  logoUrl: '',
+  clientLogoUrl: '',
+  customCss: '',
 };
 
 /** Persistente Admin-Einstellungen mit In-Memory-Cache. */

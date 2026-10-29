@@ -194,6 +194,7 @@ export default function ClientSettingsPage() {
         </div>
         <div className="mt-4 space-y-2 border-t border-border pt-4">
           <p className="text-sm font-medium">{t('desktop.clientUpdate')}</p>
+          <Toggle checked={config.autoUpdateClient} onChange={(v) => void updateConfig({ autoUpdateClient: v })} label={t('desktop.autoUpdateClient')} />
           <Button size="sm" loading={checkUpdate.isPending} onClick={() => checkUpdate.mutate()}>
             {t('desktop.checkClientUpdate')}
           </Button>

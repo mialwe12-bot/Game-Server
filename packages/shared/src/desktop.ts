@@ -38,6 +38,8 @@ export interface DesktopConfig {
   discordRpc: boolean;
   /** Im Big-Picture-Modus starten (Steam Deck/Gaming-Mode: immer) */
   startInBigPicture: boolean;
+  /** Client-Updates automatisch prüfen und (wenn signiert) installieren */
+  autoUpdateClient: boolean;
 }
 
 export interface PlatformInfo {
@@ -166,6 +168,7 @@ export const DESKTOP_EVENTS = {
   achievement: 'gs://achievement',
   overlay: 'gs://overlay',
   parental: 'gs://parental',
+  clientUpdate: 'gs://client-update',
 } as const;
 
 // ---- Phase 4 ----

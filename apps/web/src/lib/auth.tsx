@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from 'react';
 import { ApiError, type CurrentUser, type MeResponse, type PublicSettings, type WsEvent } from '@gameserver/shared';
 import { desktop, isDesktop } from '../desktop/bridge';
 import i18n from '../i18n';
-import { api } from './api';
+import { api, onApiSessionChange, setApiSession } from './api';
 import { emitWsEvent } from './events';
 import { handleSocialEvent } from './social';
 import { toast } from './toast';
@@ -23,6 +23,8 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
+  // Zählt Sitzungswechsel (Login/Logout/Serverwechsel) – erzwingt Neubewertung von `enabled` und WebSocket-Neuverbindung.
+  const [sessionTick, bumpSession] = useReducer((n: number) => n + 1, 0);
   const me = useQuery({
     queryKey: ['me'],
     queryFn: async (): Promise<MeResponse> => {
@@ -66,13 +68,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await api.auth.logout().catch(() => undefined);
     if (isDesktop) {
-      api.token = null;
       await desktop.clearSession();
     }
     qc.clear();
     qc.setQueryData(['me'], { user: null, csrfToken: null });
+    // Token entfernen und Beobachter benachrichtigen (WebSocket trennt, Queries laden neu)
+    setApiSession({ token: null });
     await qc.invalidateQueries({ queryKey: ['public-settings'] });
   }, [qc]);
+
+  // Sitzungswechsel (Login/Logout/Serverwechsel): Benutzer und Einstellungen frisch laden, neu rendern.
+  useEffect(
+    () =>
+      onApiSessionChange(() => {
+        bumpSession();
+        void qc.invalidateQueries({ queryKey: ['me'] });
+        void qc.invalidateQueries({ queryKey: ['public-settings'] });
+      }),
+    [qc],
+  );
+
+  // Offline: regelmäßig erneut versuchen, damit der Client ohne Neustart wieder online geht.
+  useEffect(() => {
+    if (!offline) return;
+    const id = setInterval(() => {
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['public-settings'] });
+    }, 8000);
+    return () => clearInterval(id);
+  }, [offline, qc]);
 
   // Sprache aus dem Profil übernehmen
   useEffect(() => {
@@ -106,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           break;
       }
     });
-  }, [me.isLoading, user?.id, qc, offline]);
+  }, [me.isLoading, user?.id, qc, offline, sessionTick]);
 
   return (
     <AuthContext.Provider
