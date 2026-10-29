@@ -357,10 +357,24 @@ gespeichert und unter `/api/branding/…` ausgeliefert.
 
 Unter **Verwaltung → Einstellungen → Updates** zeigt das Panel die laufende Version und prüft auf Knopfdruck, ob eine
 neuere verfügbar ist (Quelle: `UPDATE_CHECK_URL`, Standard sind die offiziellen Releases dieses Projekts – es wird nur die
-Versionsnummer abgefragt). Das eigentliche Update läuft auf dem Host: am einfachsten `sudo bash /opt/gameserver/deploy/install.sh`
-erneut ausführen (siehe Schnellstart). Wer ein **Ein-Klick-Update** im Panel möchte, hinterlegt in `UPDATE_COMMAND` einen Befehl,
-der den Server tatsächlich aktualisiert (z. B. ein Host-Watcher oder ein Skript mit Docker-Zugriff) – ohne diesen Befehl zeigt
-das Panel nur den manuellen Befehl an. Der **Desktop-Client** aktualisiert sich selbst (siehe Client-README): er prüft beim Start
+Versionsnummer abgefragt).
+
+**Manuell aktualisieren** (immer möglich):
+
+```bash
+sudo bash /opt/gameserver/deploy/self-update.sh    # holt den neuesten Stand, baut die Container neu, startet sie
+# gleichwertig: cd /opt/gameserver && git pull && docker compose up -d --build
+```
+
+Daten, `.env` und Datenbank bleiben erhalten; Migrationen laufen beim Serverstart automatisch.
+
+**Ein-Klick-Update aus dem Panel**: Der Server-Container kann sich nicht selbst neu bauen, daher schreibt
+„Jetzt aktualisieren“ nur eine Markierungsdatei (`UPDATE_COMMAND=touch /data/.update-requested`), die ein kleiner
+**Host-Watcher** (`deploy/update-watcher.sh`) erkennt und dann `self-update.sh` ausführt. `install.sh` richtet das auf
+Wunsch als systemd-Dienst ein (Frage bei der Installation, oder `GS_ONECLICK_UPDATE=yes`). Ohne diese Einrichtung zeigt
+das Panel nur den manuellen Befehl an – es werden keine erhöhten Rechte in den Container gelegt.
+
+Der **Desktop-Client** aktualisiert sich selbst (siehe Client-README): er prüft beim Start
 auf Updates, zeigt eine Hinweisleiste mit Knopf und installiert signierte Updates auf Wunsch automatisch.
 
 ---

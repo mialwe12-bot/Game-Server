@@ -258,6 +258,44 @@ if ! $UPDATE; then
   ok "Admin-Konto '$ADMIN_USER' angelegt"
 fi
 
+# ---------- Ein-Klick-Update aus dem Panel (optional, nur Erstinstallation) ----------
+# Richtet einen Host-Dienst ein, der „Jetzt aktualisieren“ im Admin-Panel ausführt. Ohne diesen Schritt
+# zeigt das Panel nur den manuellen Befehl – updaten geht dann per `sudo bash $INSTALL_DIR/deploy/self-update.sh`.
+if ! $UPDATE; then
+  setup_oneclick=false
+  case "${GS_ONECLICK_UPDATE:-}" in
+    yes|true|1) setup_oneclick=true ;;
+    no|false|0) setup_oneclick=false ;;
+    *) confirm "Ein-Klick-Update im Admin-Panel aktivieren? (richtet einen Host-Dienst ein)" && setup_oneclick=true ;;
+  esac
+  if $setup_oneclick; then
+    FLAG="$DATA_PATH/.update-requested"
+    set_env UPDATE_COMMAND "touch /data/.update-requested"
+    docker compose up -d >/dev/null   # .env neu laden
+    if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
+      cat > /etc/systemd/system/gameserver-update.service <<UNIT
+[Unit]
+Description=Game Server Update-Watcher
+After=docker.service
+[Service]
+Environment=GS_INSTALL_DIR=$INSTALL_DIR
+ExecStart=/usr/bin/env bash $INSTALL_DIR/deploy/update-watcher.sh $FLAG
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+UNIT
+      systemctl daemon-reload
+      systemctl enable --now gameserver-update.service >/dev/null 2>&1
+      ok "Ein-Klick-Update aktiviert (systemd-Dienst gameserver-update.service)"
+    else
+      warn "Kein systemd gefunden – Watcher wird nur bis zum Neustart ausgeführt."
+      GS_INSTALL_DIR="$INSTALL_DIR" nohup bash "$INSTALL_DIR/deploy/update-watcher.sh" "$FLAG" >"$INSTALL_DIR/.update.log" 2>&1 &
+      ok "Ein-Klick-Update aktiviert (Hintergrundprozess; nach Neustart erneut ausführen)"
+    fi
+  fi
+fi
+
 # ---------- Zusammenfassung ----------
 URL=$(grep -E '^PUBLIC_URL=' .env | cut -d= -f2-)
 echo
