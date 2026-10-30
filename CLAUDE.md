@@ -261,6 +261,15 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - **Tests**: 7 zusätzliche in `federation.test.ts` (State, Code-Eintausch direkt + peer-signiert, Schatten-User,
   peers-Route, approve-Gate, Callback-State). Gesamt 115 Server-Tests grün.
 - **Offen Stufe 2**: Desktop-Client-Login über Netzwerk (Loopback-Flow wie SSO), serverübergreifende Avatare, Rollen-Mapping.
+- **Adminzugang-Garantie (Nutzer-Wunsch #22): Nur Main-Admins haben Admin-Zugang auf dem Main-Server.** Föderierte/
+  Schatten-Konten bekommen beim Provisionieren IMMER Rolle `USER` (`provisionFederatedUser`, federation.ts – hardcodiert,
+  auch wenn der Heimat-Server den Nutzer als Admin führt); alle `/api/admin/*`-Routen verlangen per preHandler Rolle `ADMIN`
+  (admin.ts). Ein über das Netzwerk eingeloggter Nutzer kann daher nie Admin auf einem fremden Server werden. Dieses
+  Rollen-Hardcoding NICHT lockern (keine serverübergreifende Admin-Übernahme) – passt zum Security-Grundsatz „keine
+  Hintertür". Die zentrale Verwaltung „vom Main-Server aus alle anderen Server" läuft über das Admin-Panel des jeweiligen
+  Servers: Föderation (Pairing/Sync/Sperren unter `/admin/federation`), Netzwerk-Katalog (`/network`) und die zentrale
+  Voice-Server-Liste (#21) – jeder Server bleibt dabei souverän (Peer-to-Peer), es gibt bewusst keine Fern-Administration
+  fremder Server-Einstellungen/Nutzer. (Hinweis: „Mailserver" in der Anfrage = vermutlich Autokorrektur für „Main-Server".)
 
 ### Föderation Stufe 3 (fertig: föderierter Chat / Netzwerk-DMs)
 - Direktnachrichten über Servergrenzen: Nutzer A (Heimat-Server A) schreibt Nutzer R (Heimat-Server B). Auf jeder Seite ist
