@@ -47,7 +47,7 @@ function ProfileSection() {
 
   return (
     <Card title={t('account.profile')}>
-      <div className="grid gap-6 md:grid-cols-[auto_1fr]">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[auto_1fr]">
         <div className="flex flex-col items-center gap-2">
           <Avatar user={user!} size={112} />
           <input
@@ -257,7 +257,7 @@ function TwoFactorSection() {
         </div>
       ) : setup ? (
         <form
-          className="grid gap-6 md:grid-cols-[auto_1fr]"
+          className="grid grid-cols-1 gap-6 md:grid-cols-[auto_1fr]"
           onSubmit={(e) => {
             e.preventDefault();
             enable.mutate();

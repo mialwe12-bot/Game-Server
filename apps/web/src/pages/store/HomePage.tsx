@@ -26,7 +26,7 @@ function FeaturedCarousel({ games }: { games: GameSummary[] }) {
     <section className="space-y-3">
       <h2 className="text-xl font-semibold uppercase tracking-wide">{t('store.featured')}</h2>
       <div className="relative overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-        <Link to={`/game/${game.slug}`} className="grid md:grid-cols-[2fr_1fr]">
+        <Link to={`/game/${game.slug}`} className="grid grid-cols-1 md:grid-cols-[2fr_1fr]">
           <GameCover game={game} landscape className="md:aspect-auto md:min-h-80" />
           <div className="flex flex-col gap-3 p-5">
             <h3 className="text-2xl font-bold">{game.title}</h3>

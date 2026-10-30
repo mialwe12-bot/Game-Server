@@ -168,7 +168,7 @@ function Reviews({ game }: { game: GameDetail }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ['reviews'] });
   const data = reviews.data;
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2">
           <Select className="w-auto" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>

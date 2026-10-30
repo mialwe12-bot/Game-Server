@@ -342,7 +342,7 @@ export function Layout() {
           </nav>
         )}
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-4 sm:py-6">
         <Outlet />
       </main>
       <footer className="border-t border-border py-6 text-center text-xs text-muted">

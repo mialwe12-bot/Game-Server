@@ -375,7 +375,7 @@ export default function ProfilePage() {
             {t(p.visibility === 'FRIENDS' ? 'social.profile.friendsOnly' : 'social.profile.private')}
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
             <div className="space-y-4">
               {p.showcases.map((s, i) => (
                 <Showcase key={i} s={s} profile={p} />

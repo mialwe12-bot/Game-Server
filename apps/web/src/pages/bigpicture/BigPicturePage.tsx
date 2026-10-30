@@ -306,7 +306,7 @@ function GameDetailView({ gameId, onBack }: { gameId: string; onBack: () => void
             {t('bigPicture.back')}
           </button>
         </div>
-        <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[2fr_1fr]">
           <div className="text-lg text-white/80">
             <Markdown>{g.shortDescription || g.description.slice(0, 1200)}</Markdown>
           </div>

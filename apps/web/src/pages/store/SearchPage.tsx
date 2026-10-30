@@ -121,7 +121,7 @@ export default function SearchPage() {
           {t('store.filters')}
         </Button>
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_260px]">
         <div className="order-2 space-y-4 lg:order-1">
           <div className="flex items-center gap-2 text-sm text-muted">
             {results.data && t('store.results', { count: results.data.total })}

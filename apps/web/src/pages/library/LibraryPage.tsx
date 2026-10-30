@@ -131,7 +131,7 @@ export default function LibraryPage() {
   );
 
   return (
-    <div className="grid gap-6 md:grid-cols-[220px_1fr]">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-[220px_1fr]">
       <aside className="space-y-1">
         <h1 className="mb-3 text-2xl font-bold">{t('library.title')}</h1>
         {sideItem('all', t('library.all'), <Gamepad2 className="size-4" />)}

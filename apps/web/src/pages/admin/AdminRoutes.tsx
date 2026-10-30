@@ -40,7 +40,7 @@ export default function AdminRoutes() {
   const isAdmin = user?.role === 'ADMIN';
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[220px_1fr]">
       <aside className="space-y-4">
         <h1 className="text-xl font-bold">{t('admin.title')}</h1>
         <nav className="scrollbar-thin flex gap-1 overflow-x-auto lg:flex-col">

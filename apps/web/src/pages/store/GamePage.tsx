@@ -273,7 +273,7 @@ export default function GamePage() {
         <GameCommunity game={g} tab={tab as GameTab} topicId={topicId} />
       ) : (
       <>
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <MediaGallery game={g} />
         <aside className="space-y-4">
           <GameCover game={g} landscape className="hidden rounded-lg lg:block" />
@@ -327,7 +327,7 @@ export default function GamePage() {
         </aside>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <div className="order-2 space-y-6 lg:order-1">
           <Card>
             <div className="flex flex-wrap items-center gap-3">

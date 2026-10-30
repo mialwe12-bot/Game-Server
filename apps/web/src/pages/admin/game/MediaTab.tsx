@@ -115,7 +115,7 @@ export function MediaTab({ game, onChange }: { game: ManagedGame; onChange: () =
   const { t } = useTranslation();
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-[1fr_2fr]">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_2fr]">
         <Single game={game} kind="COVER" label={t('admin.media.cover')} onChange={onChange} aspect="aspect-[2/3]" />
         <div className="space-y-6">
           <Single game={game} kind="HEADER" label={t('admin.media.header')} onChange={onChange} aspect="aspect-[46/21]" />

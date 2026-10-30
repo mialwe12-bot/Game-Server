@@ -67,7 +67,7 @@ export default function WorkshopItemPage() {
       <Link to={`/game/${i.game.slug}/workshop`} className="text-sm text-accent hover:underline">
         ← {i.game.title} · {t('social.community.tabs.workshop')}
       </Link>
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-surface-2">
             {i.previewUrl ? <img src={api.url(i.previewUrl)} alt="" className="size-full object-cover" /> : <Package className="absolute inset-0 m-auto size-16 text-muted" />}

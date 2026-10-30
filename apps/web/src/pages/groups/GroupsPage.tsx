@@ -69,7 +69,7 @@ export default function GroupsPage() {
       {groups.isLoading ? (
         <PageLoader />
       ) : groups.data?.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {groups.data.map((g) => (
             <GroupCard key={g.id} g={g} />
           ))}
@@ -124,7 +124,7 @@ export function GroupFormModal({
         <Field label={t('social.groups.description')} hint={t('common.markdownHint')}>
           <Textarea rows={6} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={t('social.groups.joinPolicy')}>
             <Select value={form.joinPolicy} onChange={(e) => setForm({ ...form, joinPolicy: e.target.value as GroupJoinPolicy })}>
               {(['OPEN', 'REQUEST', 'INVITE'] as const).map((p) => (
