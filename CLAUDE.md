@@ -283,9 +283,27 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - **Offen Stufe 3**: Gruppen-/Kanal-Föderation (nur DMs umgesetzt), Zustellquittungen/Retry-Queue (aktuell best-effort),
   Präsenz über Server, Avatare.
 
+### Föderierte Downloads im Desktop-Client (fertig, #19) — Client 0.4.2
+- `RemoteDownloadDto` (Server) um Build-Metadaten erweitert (buildId, platform, version, executable, launchArgs,
+  workingDir, installerArgs, linuxRunner, installSize, totalSize) – damit der Client ohne Zugriff aufs Herkunfts-Manifest
+  installieren/starten kann.
+- Client (`game-client`): `ApiClient.network_download` (POST /api/network/games/:serverId/builds/:buildId/download);
+  Download-Manager `enqueue_federated(FederatedInstall)` baut aus der Antwort ein synthetisches `BuildManifest` mit
+  absoluten, signierten URLs (`url()` leitet absolute URLs durch) und lädt wie ein normaler Ordner-/Archiv-Build;
+  `JobData.federation: Option<BuildManifest>` (serde default), `run_job` nutzt es statt `api.manifest`.
+- Föderierte Spiele haben game_id `fed:<serverId>:<slug>` (Helfer `federated_game_id`/`is_federated_game`). Server-Sync
+  wird übersprungen: `add_to_library` (finish), Spielzeit-Meldung (`playtime.rs`), Spielstart-Anmeldung (`play.rs announce`).
+- Tauri-Befehl `install_network_game` (commands.rs, in lib.rs registriert); Frontend-Bridge `desktop.installNetworkGame`;
+  `NetworkPage` nutzt im Desktop-Modus den Client (auch Ordner-Builds), im Web Direktlink (Einzeldatei). i18n
+  `network.installStarted`.
+- Test: `installs_federated_folder_build` (crates/core/tests/downloader.rs) lädt echt über absolute URLs gegen den
+  Mock-Server; Core 15 Integrationstests grün.
+- **Offen #19**: Delta-/Reparatur für föderierte Spiele, Update-Erkennung über Server-Grenzen, serverübergreifende
+  Spielzeit/Achievements (bewusst nicht synchronisiert).
+
 ### Noch offen aus „ALLES"
-- **Desktop-Client: föderierte (Ordner-)Downloads** (Task #19) – Client nutzt die signierten Remote-URLs.
-- **Fluxer eingebetteter Voice-Client** (Task #20) – braucht zum Live-Test OAuth2-App auf `chat.nebendahl.eu`.
+- **Fluxer eingebetteter Voice-Client** (Task #20) – braucht zum Live-Test OAuth2-App auf `chat.nebendahl.eu` (client_id,
+  Redirect-URLs, Scopes). Ohne diese nur blind baubar, nicht testbar.
 
 ## Konventionen
 
