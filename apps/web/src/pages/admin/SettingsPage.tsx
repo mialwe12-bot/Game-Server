@@ -135,6 +135,23 @@ export default function SettingsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Toggle checked={s.voiceEnabled} onChange={(v) => setS({ ...s, voiceEnabled: v })} label={t('admin.settingsPage.voiceEnabled')} />
           <Toggle checked={s.gifsEnabled} onChange={(v) => setS({ ...s, gifsEnabled: v })} label={t('admin.settingsPage.gifsEnabled')} />
+          {s.voiceEnabled && (
+            <Field label={t('admin.settingsPage.voiceBackend')}>
+              <select
+                value={s.voiceBackend}
+                onChange={(e) => setS({ ...s, voiceBackend: e.target.value as 'MESH' | 'LIVEKIT' })}
+                className="h-10 w-full rounded-md border border-border bg-surface px-2 text-sm"
+              >
+                <option value="MESH">{t('admin.settingsPage.voiceBackendMesh')}</option>
+                <option value="LIVEKIT">{t('admin.settingsPage.voiceBackendLivekit')}</option>
+              </select>
+            </Field>
+          )}
+          {s.voiceEnabled && s.voiceBackend === 'LIVEKIT' && (
+            <Field label={t('admin.settingsPage.livekitUrl')} hint={t('admin.settingsPage.livekitUrlHint')}>
+              <Input value={s.livekitUrl} onChange={(e) => setS({ ...s, livekitUrl: e.target.value })} placeholder="wss://voice.example.com" />
+            </Field>
+          )}
           <Field label={t('admin.settingsPage.maxChatImageMb')}>
             <Input
               type="number"

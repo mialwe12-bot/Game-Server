@@ -132,6 +132,10 @@ export interface AdminSettings {
   backupSchedule: BackupSchedule;
   /** Sprachchat (WebRTC) in Chats/Gruppen erlauben */
   voiceEnabled: boolean;
+  /** Voice-Backend: eingebautes Mesh oder eigener LiveKit-SFU */
+  voiceBackend: 'MESH' | 'LIVEKIT';
+  /** Öffentliche wss-URL des LiveKit-Servers (nur bei Backend LIVEKIT) */
+  livekitUrl: string;
   /** GIF-Suche im Chat (nur wirksam mit TENOR_API_KEY) */
   gifsEnabled: boolean;
   maxChatImageBytes: number;

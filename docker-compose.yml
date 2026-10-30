@@ -84,6 +84,23 @@ services:
       - --denied-peer-ip=172.16.0.0-172.31.255.255
       - --denied-peer-ip=192.168.0.0-192.168.255.255
 
+  # Eigener Voice-SFU (LiveKit) – Alternative zum eingebauten Mesh, skaliert deutlich besser.
+  # Start: docker compose --profile voice-sfu up -d
+  # In .env: LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_NODE_IP (öffentliche Server-IP).
+  # Im Admin-Panel: Voice-Backend = LiveKit, Adresse z. B. wss://voice.<deine-domain> (per Caddy auf 7880 terminieren).
+  # Firewall: 7880/tcp, 7881/tcp und 50000-60000/udp freigeben.
+  livekit:
+    image: livekit/livekit-server:v1.8
+    profiles: ["voice-sfu"]
+    container_name: gameserver-livekit
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?LIVEKIT_API_KEY in .env setzen}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET in .env setzen}"
+    command:
+      - --bind=0.0.0.0
+      - --node-ip=${LIVEKIT_NODE_IP:?LIVEKIT_NODE_IP (oeffentliche Server-IP) in .env setzen}
+
 networks:
   internal: {}
   reverse-proxy:

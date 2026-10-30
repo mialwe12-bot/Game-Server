@@ -46,6 +46,9 @@ const schema = z.object({
   WEBRTC_STUN_URLS: z.string().default(''),
   WEBRTC_TURN_URLS: z.string().default(''),
   WEBRTC_TURN_SECRET: z.string().default(''),
+  // Eigener LiveKit-SFU als Voice-Backend (Admin wählt Backend; URL in den Einstellungen).
+  LIVEKIT_API_KEY: z.string().default(''),
+  LIVEKIT_API_SECRET: z.string().default(''),
   // Updates: Quelle für die Versionsprüfung (GitHub-Tags/Releases-API oder eigener JSON-Endpunkt mit {version}); leer = aus.
   UPDATE_CHECK_URL: z.string().default('https://api.github.com/repos/mialwe12-bot/Game-Server/tags'),
   // Vom Betreiber bereitgestellter Befehl, der das Update anwendet (z. B. Host-Watcher/Docker-Socket); leer = nur Anzeige.

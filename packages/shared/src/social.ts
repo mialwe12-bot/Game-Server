@@ -166,11 +166,25 @@ export interface IceServer {
   credential?: string;
 }
 
+/** Voice-Backend: eingebautes WebRTC-Mesh oder ein eigener LiveKit-SFU. */
+export type VoiceBackend = 'MESH' | 'LIVEKIT';
+
 export interface ChatConfig {
   gifsEnabled: boolean;
   voiceEnabled: boolean;
+  /** Welches Voice-Backend aktiv ist. */
+  voiceBackend: VoiceBackend;
+  /** Öffentliche wss-URL des LiveKit-Servers (nur bei Backend LIVEKIT). */
+  livekitUrl: string;
   iceServers: IceServer[];
   maxImageBytes: number;
+}
+
+/** Zugangsdaten, um einem LiveKit-Voice-Raum beizutreten. */
+export interface VoiceToken {
+  url: string;
+  token: string;
+  room: string;
 }
 
 export interface GifResult {

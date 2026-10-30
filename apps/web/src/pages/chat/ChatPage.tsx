@@ -276,7 +276,7 @@ function ConversationView({ id, config, basePath }: { id: string; config: ChatCo
                 variant="ghost"
                 icon={<PhoneCall className="size-4" />}
                 title={t('social.voice.join')}
-                onClick={() => void voice.join(id, user!.id, config.iceServers).catch((e) => toast.error(t('social.voice.micError', { error: errorMessage(e) })))}
+                onClick={() => void voice.join(id, user!.id, config).catch((e) => toast.error(t('social.voice.micError', { error: errorMessage(e) })))}
               />
             )}
           </div>

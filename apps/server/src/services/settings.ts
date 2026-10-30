@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   uploadChunkBytes: 16 * 1024 ** 2,
   backupSchedule: { enabled: false, intervalHours: 24, includeFiles: false, keep: 7 },
   voiceEnabled: false,
+  voiceBackend: 'MESH',
+  livekitUrl: '',
   gifsEnabled: true,
   maxChatImageBytes: 8 * 1024 ** 2,
   cloudSavesEnabled: true,

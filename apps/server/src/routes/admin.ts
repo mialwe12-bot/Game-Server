@@ -298,6 +298,8 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
               keep: z.number().int().min(0).max(1000),
             }),
             voiceEnabled: z.boolean(),
+            voiceBackend: z.enum(['MESH', 'LIVEKIT']),
+            livekitUrl: z.string().max(300).regex(/^(|wss?:\/\/.+)$/, 'Muss leer oder eine ws(s)-URL sein'),
             gifsEnabled: z.boolean(),
             maxChatImageBytes: z.number().int().min(64 * 1024).max(100 * 1024 ** 2),
             cloudSavesEnabled: z.boolean(),

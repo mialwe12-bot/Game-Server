@@ -301,9 +301,29 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - **Offen #19**: Delta-/Reparatur für föderierte Spiele, Update-Erkennung über Server-Grenzen, serverübergreifende
   Spielzeit/Achievements (bewusst nicht synchronisiert).
 
-### Noch offen aus „ALLES"
-- **Fluxer eingebetteter Voice-Client** (Task #20) – braucht zum Live-Test OAuth2-App auf `chat.nebendahl.eu` (client_id,
-  Redirect-URLs, Scopes). Ohne diese nur blind baubar, nicht testbar.
+### #20 Voice – Fluxer-Grenze + eigener LiveKit-SFU (umgesetzt)
+- **Fluxer-Recherche (wichtig):** Fluxers Voice läuft komplett über das Gateway (Voice State Update, Opcode 4). Laut
+  Fluxer-Doku (`/authentication/`) akzeptiert das Gateway-IDENTIFY nur **Bot- oder User-Session-Token**, **NICHT** OAuth2.
+  → Ein echter, selbst gebauter Voice-Client *als der Nutzer* über unsere OAuth2-App ist mit Fluxer **technisch nicht
+  möglich** (bräuchte das Fluxer-Session-Token; das per Passwort abzugreifen wurde abgelehnt). Fluxers Medien laufen auf
+  **LiveKit**. Nutzer-Entscheidung daher: **eigener Voice-Server statt Fluxer** (volle Kontrolle, testbar).
+- OAuth2-App existiert beim Nutzer (`client_id` 1565628080209264640, Redirect `https://games.nebendahl.eu/fluxer/callback`),
+  aktuell ungenutzt – aufheben für optionale spätere Identitäts-Verknüpfung. **Secret nie im Code/Chat** (einmal im Chat
+  geleakt → Nutzer hat es zurückgesetzt).
+- **Umgesetzt: LiveKit-SFU als optionales Voice-Backend** (Admin wählt MESH ↔ LIVEKIT; Mesh bleibt Standard):
+  - Settings `voiceBackend` ('MESH'|'LIVEKIT') + `livekitUrl`; Env `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`.
+  - `lib/livekit.ts` `createLivekitToken` (dependency-freies HS256-JWT, Grant im `video`-Claim, identity=userId,
+    room=`conv_<conversationId>`, 6 h). `ChatService.config` meldet Backend+URL (ICE nur bei MESH); `ChatService.voiceToken`
+    (nur Mitglieder, nur wenn LiveKit konfiguriert). Route `GET /api/chat/voice/token?conversationId=`.
+  - Web: `pages/chat/livekit.ts` (livekit-client: Room beitreten, Mikro publizieren, Remote-Audio anhängen); `voice.ts`
+    ist jetzt eine Weiche (Mesh **oder** LiveKit fürs Medium, WS-Hub weiterhin für Teilnehmer-Anzeige). Admin-UI
+    (SettingsPage) Backend-Auswahl + wss-URL; i18n `admin.settingsPage.voice*`/`livekitUrl*`. ApiClient `chat.voiceToken`.
+  - Infra: `docker compose --profile voice-sfu` (livekit/livekit-server, host-net, LIVEKIT_NODE_IP); `.env.example` + README.
+  - Tests: `test/voice.test.ts` (5, grün): JWT-Claims/Signatur, Token-Route (Mitglied/Nicht-Mitglied/unkonfiguriert),
+    config-Backend. Gesamt 123 Server-Tests grün.
+- **Offen #20:** Live-Test des LiveKit-Medienpfads braucht einen laufenden LiveKit-Server (in der Sandbox nicht möglich);
+  Code + Token sind getestet, die Medien-Verbindung verifiziert der Nutzer gegen seine Instanz. Fluxer-Identitäts-SSO
+  (optional) nicht gebaut.
 
 ## Konventionen
 

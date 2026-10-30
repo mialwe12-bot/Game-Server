@@ -46,6 +46,7 @@ import type {
 import type {
   ActivityDto,
   ChatConfig,
+  VoiceToken,
   CommunityItemDto,
   CommunityItemType,
   ConversationDto,
@@ -626,6 +627,7 @@ export class ApiClient {
 
   chat = {
     config: () => this.get<ChatConfig>('/chat/config'),
+    voiceToken: (conversationId: string) => this.get<VoiceToken>('/chat/voice/token', { conversationId }),
     conversations: () => this.get<ConversationDto[]>('/chat/conversations'),
     conversation: (id: string) => this.get<ConversationDto>(`/chat/conversations/${id}`),
     unread: () => this.get<{ count: number }>('/chat/unread'),

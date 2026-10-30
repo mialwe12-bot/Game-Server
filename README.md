@@ -149,6 +149,20 @@ Signalisierung über den WebSocket. Das ist ohne Medienserver betreibbar und eig
 3. Browser verlangen für das Mikrofon HTTPS (oder `localhost`). Im Desktop-Client fragt Windows (WebView2) nach der Freigabe;
    unter Linux gibt der Client nur das **Mikrofon** frei (Kamera bleibt gesperrt).
 
+#### Eigener Voice-SFU (LiveKit)
+
+Das Mesh ist bis ca. 6 Personen sinnvoll. Für größere Räume, bessere Qualität und Screenshare kannst du einen eigenen
+**LiveKit-SFU** als Voice-Backend betreiben – alles selbst gehostet, keine Fremd-API:
+
+1. In `.env` setzen: `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (frei wählbar), `LIVEKIT_NODE_IP` (öffentliche Server-IP).
+2. Starten: `docker compose --profile voice-sfu up -d`. Ports `7880/tcp`, `7881/tcp`, `50000-60000/udp` freigeben; `7880`
+   per Caddy als `wss://voice.<deine-domain>` terminieren.
+3. In **Verwaltung → Einstellungen → Soziales**: „Sprachchat erlauben“ an, **Voice-Backend = LiveKit**, Adresse
+   `wss://voice.<deine-domain>` eintragen.
+
+Der Server stellt pro Unterhaltung ein zeitlich begrenztes LiveKit-Token aus (nur Mitglieder); die Teilnehmer-Anzeige
+läuft weiter über den WebSocket-Hub. Umschalten Mesh ↔ LiveKit geht jederzeit im Admin-Panel.
+
 ### GIFs
 
 Mit `TENOR_API_KEY` (kostenlos, Google Cloud Console) und aktivierter Einstellung „GIF-Suche“ erscheint im Chat ein GIF-Knopf.

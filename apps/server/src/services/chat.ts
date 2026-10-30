@@ -1,8 +1,9 @@
 import { createHmac } from 'node:crypto';
 import type { Conversation, ConversationMember, Group, Message, User } from '@prisma/client';
-import type { ChatConfig, ConversationDto, IceServer } from '@gameserver/shared';
+import type { ChatConfig, ConversationDto, IceServer, VoiceToken } from '@gameserver/shared';
 import type { AppContext } from '../context.js';
 import { forbidden, notFound } from '../lib/errors.js';
+import { createLivekitToken } from '../lib/livekit.js';
 import { fileUrl } from '../lib/image-upload.js';
 import { userPublic } from './dto.js';
 import { messageDto } from './social-dto.js';
@@ -49,9 +50,32 @@ export class ChatService {
     return {
       gifsEnabled: s.gifsEnabled && !!this.ctx.config.TENOR_API_KEY,
       voiceEnabled: s.voiceEnabled,
-      iceServers: s.voiceEnabled ? this.iceServers(userId) : [],
+      voiceBackend: s.voiceBackend,
+      livekitUrl: s.voiceBackend === 'LIVEKIT' ? s.livekitUrl : '',
+      // ICE-Server nur beim eingebauten Mesh; LiveKit bringt seine eigene Aushandlung mit.
+      iceServers: s.voiceEnabled && s.voiceBackend === 'MESH' ? this.iceServers(userId) : [],
       maxImageBytes: s.maxChatImageBytes,
     };
+  }
+
+  /** LiveKit-Zugangstoken für eine Voice-Konversation (nur Mitglieder, nur wenn LiveKit konfiguriert). */
+  async voiceToken(user: User, conversationId: string): Promise<VoiceToken> {
+    const s = await this.ctx.settings.get();
+    const { config } = this.ctx;
+    if (!s.voiceEnabled) throw forbidden('Sprachchat ist deaktiviert', 'voice_disabled');
+    if (s.voiceBackend !== 'LIVEKIT' || !s.livekitUrl || !config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET) {
+      throw forbidden('LiveKit-Voice ist nicht konfiguriert', 'livekit_not_configured');
+    }
+    await this.membership(conversationId, user.id); // wirft 404, wenn kein Mitglied
+    const room = `conv_${conversationId}`;
+    const token = createLivekitToken({
+      apiKey: config.LIVEKIT_API_KEY,
+      apiSecret: config.LIVEKIT_API_SECRET,
+      identity: user.id,
+      name: user.displayName ?? user.username,
+      room,
+    });
+    return { url: s.livekitUrl, token, room };
   }
 
   /** Mitgliedschaft prüfen (wirft 404, wenn der Nutzer nicht Mitglied ist). */

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import type { ChatConfig, ConversationDto, GifResult, MessageDto } from '@gameserver/shared';
+import type { ChatConfig, ConversationDto, GifResult, MessageDto, VoiceToken } from '@gameserver/shared';
 import { badRequest, forbidden, HttpError, notFound } from '../lib/errors.js';
 import { saveImageUpload } from '../lib/image-upload.js';
 import { requireAuth } from '../plugins/auth.js';
@@ -32,6 +32,15 @@ export const chatRoutes: FastifyPluginAsyncZod = async (app) => {
     const { user } = requireAuth(req);
     return chat.config(user.id);
   });
+
+  app.get(
+    '/voice/token',
+    { schema: { tags: ['chat'], summary: 'LiveKit-Voice-Token für eine Unterhaltung', querystring: z.object({ conversationId: z.string() }) } },
+    async (req): Promise<VoiceToken> => {
+      const { user } = requireAuth(req);
+      return chat.voiceToken(user, req.query.conversationId);
+    },
+  );
 
   app.get('/conversations', { schema: { tags: ['chat'], summary: 'Eigene Unterhaltungen' } }, async (req): Promise<ConversationDto[]> => {
     const { user } = requireAuth(req);

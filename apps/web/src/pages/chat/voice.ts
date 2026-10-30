@@ -1,6 +1,7 @@
-import type { IceServer, WsEvent } from '@gameserver/shared';
+import type { ChatConfig, IceServer, WsEvent } from '@gameserver/shared';
 import { api } from '../../lib/api';
 import { onWsEvent } from '../../lib/events';
+import { connectLivekit, type LivekitSession } from './livekit';
 
 type Signal = { sdp: RTCSessionDescriptionInit } | { candidate: RTCIceCandidateInit };
 
@@ -25,6 +26,8 @@ class VoiceManager {
   private listeners = new Set<() => void>();
   private selfId: string | null = null;
   private iceServers: IceServer[] = [];
+  private backend: 'MESH' | 'LIVEKIT' = 'MESH';
+  private lk: LivekitSession | null = null;
   private stream: MediaStream | null = null;
   private pcs = new Map<string, RTCPeerConnection>();
   private audio = new Map<string, HTMLAudioElement>();
@@ -44,12 +47,18 @@ class VoiceManager {
     for (const l of this.listeners) l();
   }
 
-  async join(conversationId: string, selfId: string, iceServers: IceServer[]): Promise<void> {
+  async join(conversationId: string, selfId: string, config: ChatConfig): Promise<void> {
     if (this.state.joined) await this.leave();
     this.selfId = selfId;
-    this.iceServers = iceServers;
+    this.backend = config.voiceBackend;
+    this.iceServers = config.iceServers;
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+      if (this.backend === 'LIVEKIT') {
+        // Audio über den eigenen LiveKit-SFU; der Hub liefert nur die Teilnehmer-Anzeige.
+        this.lk = await connectLivekit(conversationId);
+      } else {
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+      }
     } catch (err) {
       this.set({ error: err instanceof Error ? err.message : String(err) });
       throw err;
@@ -61,6 +70,10 @@ class VoiceManager {
   async leave(): Promise<void> {
     const id = this.state.conversationId;
     if (id) api.wsSend({ type: 'voice.leave', data: { conversationId: id } });
+    if (this.lk) {
+      await this.lk.disconnect().catch(() => undefined);
+      this.lk = null;
+    }
     for (const pc of this.pcs.values()) pc.close();
     this.pcs.clear();
     for (const a of this.audio.values()) {
@@ -76,14 +89,16 @@ class VoiceManager {
 
   toggleMute(): void {
     const muted = !this.state.muted;
-    this.stream?.getAudioTracks().forEach((t) => (t.enabled = !muted));
+    if (this.lk) void this.lk.setMuted(muted);
+    else this.stream?.getAudioTracks().forEach((t) => (t.enabled = !muted));
     this.set({ muted });
   }
 
   private onEvent(e: WsEvent) {
     if (e.type === 'voice.participants') {
       this.set({ participants: { ...this.state.participants, [e.data.conversationId]: e.data.userIds } });
-      if (this.state.joined && e.data.conversationId === this.state.conversationId) this.syncPeers(e.data.userIds);
+      // Mesh baut pro Teilnehmer eine PeerConnection auf; bei LiveKit übernimmt der SFU die Medien.
+      if (this.backend === 'MESH' && this.state.joined && e.data.conversationId === this.state.conversationId) this.syncPeers(e.data.userIds);
     } else if (e.type === 'voice.signal' && this.state.joined && e.data.conversationId === this.state.conversationId) {
       void this.onSignal(e.data.from, e.data.signal as Signal);
     } else if (e.type === 'hello' && this.state.joined && this.state.conversationId) {
