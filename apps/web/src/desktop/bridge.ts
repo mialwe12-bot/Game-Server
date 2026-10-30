@@ -44,6 +44,8 @@ export const desktop = {
 
   installedGames: () => invoke<InstalledGame[]>('installed_games'),
   installGame: (req: InstallRequest) => invoke<DownloadJob>('install_game', { req }),
+  installNetworkGame: (req: { serverId: string; buildId: string; slug: string; title: string; coverUrl?: string | null; libraryFolder?: string }) =>
+    invoke<DownloadJob>('install_network_game', { req }),
   updateGame: (gameId: string, versionId?: string | null) => invoke<DownloadJob>('update_game', { gameId, versionId: versionId ?? null }),
   repairGame: (gameId: string) => invoke<DownloadJob>('repair_game', { gameId }),
   uninstallGame: (gameId: string, removePrefix: boolean, removeAll: boolean) => invoke<void>('uninstall_game', { gameId, removePrefix, removeAll }),

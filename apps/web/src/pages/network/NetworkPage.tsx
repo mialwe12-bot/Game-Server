@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import type { NetworkGameDto, RemoteBuildDto } from '@gameserver/shared';
 import { PlatformIcon } from '../../components/PlatformIcons';
 import { Badge, Button, Card, EmptyState, Input, PageLoader } from '../../components/ui';
+import { desktop, isDesktop } from '../../desktop/bridge';
 import { api, errorMessage } from '../../lib/api';
 import { formatBytes } from '../../lib/format';
 import { toast } from '../../lib/toast';
@@ -53,13 +54,23 @@ function NetworkDM() {
 function NetworkGameCard({ game }: { game: NetworkGameDto }) {
   const { t } = useTranslation();
   const download = useMutation({
-    mutationFn: (build: RemoteBuildDto) => api.network.download(game.serverId, build.buildId),
-    onSuccess: (res) => {
-      if (res.files.length === 1) {
-        // Einzeldatei-Build: direkt vom Herkunftsserver laden
-        window.location.href = res.files[0].url;
+    mutationFn: async (build: RemoteBuildDto) => {
+      if (isDesktop) {
+        // Desktop-Client: über den Download-Manager installieren (auch Ordner-Builds)
+        await desktop.installNetworkGame({ serverId: game.serverId, buildId: build.buildId, slug: game.slug, title: game.title, coverUrl: game.coverUrl });
+        return { desktop: true as const };
+      }
+      const res = await api.network.download(game.serverId, build.buildId);
+      return { desktop: false as const, res };
+    },
+    onSuccess: (r) => {
+      if (r.desktop) {
+        toast.success(t('network.installStarted'));
+      } else if (r.res.files.length === 1) {
+        // Web, Einzeldatei-Build: direkt vom Herkunftsserver laden
+        window.location.href = r.res.files[0].url;
       } else {
-        // Ordner-Build: im Browser nicht praktikabel – Hinweis auf den Desktop-Client
+        // Web, Ordner-Build: nicht praktikabel – Hinweis auf den Desktop-Client
         toast.info(t('network.folderHint'));
       }
     },

@@ -1486,6 +1486,7 @@ const en: Translation = {
     dmTitle: 'Message a network user',
     dmUser: 'Username',
     dmStart: 'Message',
+    installStarted: 'Download started.',
     emptyTitle: 'No network games',
     emptyDesc: "Once your server is connected to others, their public games appear here.",
   },

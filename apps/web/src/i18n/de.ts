@@ -1485,6 +1485,7 @@ const de = {
     dmTitle: 'Netzwerk-Nutzer anschreiben',
     dmUser: 'Benutzername',
     dmStart: 'Anschreiben',
+    installStarted: 'Download gestartet.',
     emptyTitle: 'Keine Netzwerk-Spiele',
     emptyDesc: 'Sobald dein Server mit anderen verbunden ist, erscheinen hier deren öffentliche Spiele.',
   },
