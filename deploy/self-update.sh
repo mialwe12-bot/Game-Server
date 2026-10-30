@@ -2,7 +2,7 @@
 # =====================================================================================================
 # Game Server – Update einer bestehenden Docker-Installation.
 #
-#   sudo bash /opt/gameserver/deploy/self-update.sh
+#   sudo bash deploy/self-update.sh   (im Installationsordner ausfuehren)
 #
 # Holt den neuesten Stand des eingestellten Branches, baut die Container neu und startet sie.
 # Daten (.env, Spieldateien, Datenbank) bleiben erhalten; Datenbank-Migrationen laufen beim Serverstart automatisch.
@@ -12,15 +12,9 @@
 # =====================================================================================================
 set -euo pipefail
 
-# Installationsverzeichnis: GS_INSTALL_DIR > Ordner dieses Skripts (falls dort docker-compose.yml liegt) > Standard
-if ! _self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"; then _self_dir=""; fi
-if [[ -n "${GS_INSTALL_DIR:-}" ]]; then
-  INSTALL_DIR="$GS_INSTALL_DIR"
-elif [[ -n "$_self_dir" && -f "$_self_dir/docker-compose.yml" ]]; then
-  INSTALL_DIR="$_self_dir"
-else
-  INSTALL_DIR="/opt/gameserver"
-fi
+# Installationsverzeichnis = Ordner, in dem dieses Skript liegt (deploy/..); per GS_INSTALL_DIR uebersteuerbar.
+_self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+INSTALL_DIR="${GS_INSTALL_DIR:-$(cd "$(dirname "$_self")/.." && pwd)}"
 
 if [[ -t 1 ]]; then B=$'\e[1m'; G=$'\e[32m'; R=$'\e[31m'; N=$'\e[0m'; else B='' G='' R='' N=''; fi
 info() { echo "${B}==>${N} $*"; }

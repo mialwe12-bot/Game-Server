@@ -2,7 +2,7 @@
 # =====================================================================================================
 # Aktiviert das Ein-Klick-Update im Admin-Panel nachträglich – ohne Neuinstallation.
 #
-#   sudo bash /opt/gameserver/deploy/enable-oneclick-update.sh
+#   sudo bash deploy/enable-oneclick-update.sh   (im Installationsordner ausfuehren)
 #
 # Setzt UPDATE_COMMAND in der .env (schreibt beim Klick eine Markierungsdatei), richtet einen Host-Dienst ein,
 # der self-update.sh ausführt, sobald die Markierung erscheint, und lädt die Server-Konfiguration neu.
@@ -10,15 +10,9 @@
 # =====================================================================================================
 set -euo pipefail
 
-# Installationsverzeichnis: GS_INSTALL_DIR > Ordner dieses Skripts (falls dort docker-compose.yml liegt) > Standard
-if ! _self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"; then _self_dir=""; fi
-if [[ -n "${GS_INSTALL_DIR:-}" ]]; then
-  INSTALL_DIR="$GS_INSTALL_DIR"
-elif [[ -n "$_self_dir" && -f "$_self_dir/docker-compose.yml" ]]; then
-  INSTALL_DIR="$_self_dir"
-else
-  INSTALL_DIR="/opt/gameserver"
-fi
+# Installationsverzeichnis = Ordner, in dem dieses Skript liegt (deploy/..); per GS_INSTALL_DIR uebersteuerbar.
+_self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+INSTALL_DIR="${GS_INSTALL_DIR:-$(cd "$(dirname "$_self")/.." && pwd)}"
 DISABLE=false
 [[ "${1:-}" == "--disable" ]] && DISABLE=true
 
