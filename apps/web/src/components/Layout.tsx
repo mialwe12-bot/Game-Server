@@ -212,16 +212,17 @@ function MenuLink({ to, icon, children, onClick }: { to: string; icon: ReactNode
   );
 }
 
-function HeaderSearch() {
+function HeaderSearch({ mobile, onDone }: { mobile?: boolean; onDone?: () => void } = {}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   return (
     <form
-      className="relative hidden md:block"
+      className={mobile ? 'relative w-full' : 'relative hidden md:block'}
       onSubmit={(e) => {
         e.preventDefault();
         navigate(`/search?q=${encodeURIComponent(q)}`);
+        onDone?.();
       }}
     >
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
@@ -229,7 +230,10 @@ function HeaderSearch() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder={t('store.searchPlaceholder')}
-        className="h-9 w-56 rounded-md border border-border bg-surface-2 pr-3 pl-9 text-sm focus:w-72 focus:border-accent focus:outline-none lg:w-64"
+        className={clsx(
+          'h-9 rounded-md border border-border bg-surface-2 pr-3 pl-9 text-sm focus:border-accent focus:outline-none',
+          mobile ? 'w-full' : 'w-56 focus:w-72 lg:w-64',
+        )}
         aria-label={t('common.search')}
       />
     </form>
@@ -329,9 +333,16 @@ export function Layout() {
             <UserMenu />
           </div>
         </div>
-        {mobileOpen && <nav className="flex flex-col gap-1 border-t border-border px-4 py-2 xl:hidden">{navItems(false)}</nav>}
+        {mobileOpen && (
+          <nav className="flex flex-col gap-1 border-t border-border px-4 py-3 xl:hidden">
+            <div className="mb-2 md:hidden">
+              <HeaderSearch mobile onDone={() => setMobileOpen(false)} />
+            </div>
+            {navItems(false)}
+          </nav>
+        )}
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
         <Outlet />
       </main>
       <footer className="border-t border-border py-6 text-center text-xs text-muted">
