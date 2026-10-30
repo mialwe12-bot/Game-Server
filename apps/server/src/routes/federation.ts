@@ -5,8 +5,10 @@ import type {
   FederationInfo,
   FederationPairingCode,
   NetworkGameDto,
+  RemoteAdminOverview,
   RemoteDownloadDto,
   RemoteGameDto,
+  RemoteUserDto,
 } from '@gameserver/shared';
 import { requireAdmin, requireAuth } from '../plugins/auth.js';
 import { notFound } from '../lib/errors.js';
@@ -110,6 +112,44 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // --- Fern-Administration, R-Seite (peer-signiert, nur wenn adminGranted) ---
+  // Mutationen tragen ihre Parameter in der signierten URL (Query), nicht im unsignierten Body.
+  app.get('/federation/admin/status', { schema: { tags: ['federation'], summary: 'Darf der aufrufende Server uns fernverwalten?' }, config: { skipCsrf: true } }, async (req) =>
+    fed.adminStatusFor(req.headers as Record<string, unknown>, req.method, req.url),
+  );
+
+  app.get('/federation/admin/overview', { schema: { tags: ['federation'], summary: 'Übersicht für die Fernverwaltung' }, config: { skipCsrf: true } }, async (req): Promise<RemoteAdminOverview> => {
+    await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+    return fed.localOverview();
+  });
+
+  app.get(
+    '/federation/admin/users',
+    { schema: { tags: ['federation'], summary: 'Nutzerliste für die Fernverwaltung', querystring: z.object({ q: z.string().trim().max(100).optional() }) }, config: { skipCsrf: true } },
+    async (req): Promise<RemoteUserDto[]> => {
+      await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+      return fed.localUsers(req.query.q);
+    },
+  );
+
+  app.post(
+    '/federation/admin/users/:id',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Nutzer per Fernverwaltung ändern',
+        params: z.object({ id: z.string() }),
+        querystring: z.object({ role: z.enum(['ADMIN', 'UPLOADER', 'USER']).optional(), disabled: z.enum(['true', 'false']).optional() }),
+      },
+      config: { skipCsrf: true },
+    },
+    async (req): Promise<RemoteUserDto> => {
+      await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+      const disabled = req.query.disabled === undefined ? undefined : req.query.disabled === 'true';
+      return fed.localUpdateUser(req.params.id, { role: req.query.role, disabled });
+    },
+  );
+
   // --- Per Pairing-Code: eingehende Anmeldung eines anderen Servers ---
   app.post(
     '/federation/pair',
@@ -189,6 +229,50 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remove', target: req.params.id, ip: req.ip });
     return { ok: true };
   });
+
+  // --- Fern-Administration, Hub-Seite (lokaler Admin steuert verbundene Server) ---
+  app.patch(
+    '/admin/federation/servers/:id/admin-grant',
+    { schema: { tags: ['federation'], summary: 'Diesem Server die Fernverwaltung über uns erlauben/entziehen', params: z.object({ id: z.string() }), body: z.object({ granted: z.boolean() }) } },
+    async (req): Promise<FederatedServerDto> => {
+      requireAdmin(req);
+      const server = await fed.setAdminGranted(req.params.id, req.body.granted);
+      await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.admin_grant', target: req.params.id, meta: { granted: req.body.granted }, ip: req.ip });
+      return server;
+    },
+  );
+
+  app.get('/admin/federation/servers/:id/remote/overview', { schema: { tags: ['federation'], summary: 'Übersicht eines fernverwalteten Servers', params: z.object({ id: z.string() }) } }, async (req): Promise<RemoteAdminOverview> => {
+    requireAdmin(req);
+    return fed.remoteOverview(req.params.id);
+  });
+
+  app.get(
+    '/admin/federation/servers/:id/remote/users',
+    { schema: { tags: ['federation'], summary: 'Nutzer eines fernverwalteten Servers', params: z.object({ id: z.string() }), querystring: z.object({ q: z.string().trim().max(100).optional() }) } },
+    async (req): Promise<RemoteUserDto[]> => {
+      requireAdmin(req);
+      return fed.remoteUsers(req.params.id, req.query.q);
+    },
+  );
+
+  app.patch(
+    '/admin/federation/servers/:id/remote/users/:userId',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Nutzer eines fernverwalteten Servers ändern',
+        params: z.object({ id: z.string(), userId: z.string() }),
+        body: z.object({ role: z.enum(['ADMIN', 'UPLOADER', 'USER']).optional(), disabled: z.boolean().optional() }),
+      },
+    },
+    async (req): Promise<RemoteUserDto> => {
+      requireAdmin(req);
+      const server = await fed.remoteUpdateUser(req.params.id, req.params.userId, req.body);
+      await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_user_update', target: req.params.id, meta: { userId: req.params.userId, ...req.body }, ip: req.ip });
+      return server;
+    },
+  );
 
   // --- Nutzer: Netzwerk-Katalog + Download anfordern ---
   app.get('/network/games', { schema: { tags: ['federation'], summary: 'Spiele im verbundenen Netzwerk' } }, async (req): Promise<NetworkGameDto[]> => {

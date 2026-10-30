@@ -1,6 +1,6 @@
 // Typen für die Server-Föderation (Stufe 1): Netzwerk aus mehreren Servern,
 // geteilter Katalog und serverübergreifende Downloads.
-import type { BuildKind, Platform } from './types.js';
+import type { BuildKind, Platform, Role } from './types.js';
 
 /** Öffentliche Kennung eines Servers – wird beim Pairing ausgetauscht. */
 export interface FederationInfo {
@@ -49,6 +49,37 @@ export interface FederatedServerDto {
   lastError: string | null;
   gameCount: number;
   createdAt: string;
+  /** Wir erlauben diesem Peer, uns fernzuverwalten. */
+  adminGranted: boolean;
+  /** Dieser Peer erlaubt uns, ihn fernzuverwalten (zwischengespeichert aus dem Sync). */
+  adminAllowed: boolean;
+}
+
+/** Kompakte Übersicht eines fernverwalteten Servers. */
+export interface RemoteAdminOverview {
+  siteName: string;
+  version: string;
+  userCount: number;
+  adminCount: number;
+  gameCount: number;
+  storageBytes: number;
+  federatedServerCount: number;
+  maintenanceMode: boolean;
+}
+
+/** Ein Nutzer eines fernverwalteten Servers (kompakt). */
+export interface RemoteUserDto {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  email: string;
+  role: Role;
+  disabled: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+  /** Schatten-Konto (von einem weiteren Server föderiert). */
+  federated: boolean;
 }
 
 /** Vom Admin erzeugter Pairing-Code zum Verbinden eines zweiten Servers. */

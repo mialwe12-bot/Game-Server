@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Check, Copy, Link2, RefreshCw, Trash2 } from 'lucide-react';
+import { Ban, Check, Copy, Link2, RefreshCw, ServerCog, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FederatedServerDto, FederationPairingCode, FederationStatus } from '@gameserver/shared';
-import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageLoader } from '../../components/ui';
+import type { FederatedServerDto, FederationPairingCode, FederationStatus, RemoteUserDto, Role } from '@gameserver/shared';
+import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageLoader, Select, Toggle } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
-import { formatDate } from '../../lib/format';
+import { formatBytes, formatDate } from '../../lib/format';
 import { toast } from '../../lib/toast';
 
 function CopyButton({ value }: { value: string }) {
@@ -28,48 +28,176 @@ function statusTone(s: FederationStatus): 'success' | 'warning' | 'danger' {
   return s === 'ACTIVE' ? 'success' : s === 'BLOCKED' ? 'danger' : 'warning';
 }
 
+/** Nutzerzeile im Fernverwaltungs-Panel: Rolle + Deaktivierung ändern. */
+function RemoteUserRow({ serverId, u, onChange }: { serverId: string; u: RemoteUserDto; onChange: () => void }) {
+  const { t } = useTranslation();
+  const update = useMutation({
+    mutationFn: (data: { role?: Role; disabled?: boolean }) => api.federation.remoteUpdateUser(serverId, u.id, data),
+    onSuccess: onChange,
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-border py-2 text-sm">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate font-medium">{u.displayName || u.username}</span>
+          {u.federated && <Badge tone="warning">{t('federation.remote.federatedUser')}</Badge>}
+          {u.disabled && <Badge tone="danger">{t('federation.remote.disabled')}</Badge>}
+        </div>
+        <div className="truncate text-xs text-muted">{u.email}</div>
+      </div>
+      <Select value={u.role} onChange={(e) => update.mutate({ role: e.target.value as Role })} disabled={update.isPending} className="w-36">
+        <option value="USER">USER</option>
+        <option value="UPLOADER">UPLOADER</option>
+        <option value="ADMIN">ADMIN</option>
+      </Select>
+      <Button onClick={() => update.mutate({ disabled: !u.disabled })} disabled={update.isPending}>
+        {u.disabled ? t('federation.remote.enable') : t('federation.remote.disable')}
+      </Button>
+    </div>
+  );
+}
+
+/** Fernverwaltungs-Panel: Übersicht + Nutzerliste eines verbundenen Servers. */
+function RemoteAdminPanel({ server }: { server: FederatedServerDto }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [q, setQ] = useState('');
+  const [query, setQuery] = useState('');
+  const overview = useQuery({ queryKey: ['fed', 'remote', server.id, 'overview'], queryFn: () => api.federation.remoteOverview(server.id) });
+  const users = useQuery({ queryKey: ['fed', 'remote', server.id, 'users', query], queryFn: () => api.federation.remoteUsers(server.id, query || undefined) });
+  const refreshUsers = () => void qc.invalidateQueries({ queryKey: ['fed', 'remote', server.id, 'users'] });
+
+  const o = overview.data;
+  const stats: [string, string][] = o
+    ? [
+        [t('federation.remote.users'), String(o.userCount)],
+        [t('federation.remote.admins'), String(o.adminCount)],
+        [t('federation.remote.games'), String(o.gameCount)],
+        [t('federation.remote.storage'), formatBytes(o.storageBytes)],
+        [t('federation.remote.servers'), String(o.federatedServerCount)],
+        [t('federation.remote.version'), o.version],
+      ]
+    : [];
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-accent/40 bg-accent/5 p-3">
+      {overview.isError ? (
+        <p className="text-sm text-danger">{errorMessage(overview.error)}</p>
+      ) : o ? (
+        <>
+          <div className="flex items-center gap-2">
+            <ServerCog className="size-4 text-accent" />
+            <span className="font-medium">{o.siteName}</span>
+            {o.maintenanceMode && <Badge tone="warning">{t('federation.remote.maintenance')}</Badge>}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {stats.map(([label, val]) => (
+              <div key={label} className="rounded-md bg-surface p-2">
+                <div className="text-xs text-muted">{label}</div>
+                <div className="font-semibold">{val}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <PageLoader />
+      )}
+
+      <div>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(q.trim());
+          }}
+        >
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('federation.remote.searchUsers')} />
+          <Button type="submit">{t('common.search')}</Button>
+        </form>
+        <div className="mt-2">
+          {users.isLoading ? (
+            <PageLoader />
+          ) : users.data && users.data.length > 0 ? (
+            users.data.map((u) => <RemoteUserRow key={u.id} serverId={server.id} u={u} onChange={refreshUsers} />)
+          ) : (
+            <p className="py-2 text-sm text-muted">{t('federation.remote.noUsers')}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ServerRow({ server, onChange }: { server: FederatedServerDto; onChange: () => void }) {
   const { t } = useTranslation();
+  const [manage, setManage] = useState(false);
   const sync = useMutation({ mutationFn: () => api.federation.sync(server.id), onSuccess: onChange, onError: (e) => toast.error(errorMessage(e)) });
   const setStatus = useMutation({
     mutationFn: (status: FederationStatus) => api.federation.setStatus(server.id, status),
     onSuccess: onChange,
     onError: (e) => toast.error(errorMessage(e)),
   });
+  const grant = useMutation({
+    mutationFn: (granted: boolean) => api.federation.setAdminGrant(server.id, granted),
+    onSuccess: onChange,
+    onError: (e) => toast.error(errorMessage(e)),
+  });
   const remove = useMutation({ mutationFn: () => api.federation.remove(server.id), onSuccess: onChange, onError: (e) => toast.error(errorMessage(e)) });
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-medium">{server.name}</span>
-          <Badge tone={statusTone(server.status)}>{t(`federation.status.${server.status}`)}</Badge>
+    <div className="rounded-lg border border-border p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium">{server.name}</span>
+            <Badge tone={statusTone(server.status)}>{t(`federation.status.${server.status}`)}</Badge>
+          </div>
+          <div className="truncate text-xs text-muted">{server.baseUrl}</div>
+          <div className="text-xs text-muted">
+            {t('federation.gameCount', { n: server.gameCount })}
+            {' · '}
+            {server.lastSyncedAt ? t('federation.lastSync', { date: formatDate(server.lastSyncedAt) }) : t('federation.neverSynced')}
+            {server.lastError ? ` · ⚠ ${server.lastError}` : ''}
+          </div>
         </div>
-        <div className="truncate text-xs text-muted">{server.baseUrl}</div>
-        <div className="text-xs text-muted">
-          {t('federation.gameCount', { n: server.gameCount })}
-          {' · '}
-          {server.lastSyncedAt ? t('federation.lastSync', { date: formatDate(server.lastSyncedAt) }) : t('federation.neverSynced')}
-          {server.lastError ? ` · ⚠ ${server.lastError}` : ''}
+        <div className="flex gap-2">
+          {server.adminAllowed && (
+            <Button variant={manage ? 'primary' : 'secondary'} onClick={() => setManage((m) => !m)} title={t('federation.remote.manage')}>
+              <ServerCog className="size-4" />
+            </Button>
+          )}
+          <Button onClick={() => sync.mutate()} disabled={sync.isPending} title={t('federation.syncNow')}>
+            <RefreshCw className={`size-4 ${sync.isPending ? 'animate-spin' : ''}`} />
+          </Button>
+          {server.status === 'BLOCKED' ? (
+            <Button onClick={() => setStatus.mutate('ACTIVE')} title={t('federation.activate')}>
+              <Check className="size-4" />
+            </Button>
+          ) : (
+            <Button onClick={() => setStatus.mutate('BLOCKED')} title={t('federation.block')}>
+              <Ban className="size-4" />
+            </Button>
+          )}
+          <ConfirmButton onConfirm={() => remove.mutate()} title={t('federation.remove')}>
+            <Trash2 className="size-4" />
+          </ConfirmButton>
         </div>
       </div>
-      <div className="flex gap-2">
-        <Button onClick={() => sync.mutate()} disabled={sync.isPending} title={t('federation.syncNow')}>
-          <RefreshCw className={`size-4 ${sync.isPending ? 'animate-spin' : ''}`} />
-        </Button>
-        {server.status === 'BLOCKED' ? (
-          <Button onClick={() => setStatus.mutate('ACTIVE')} title={t('federation.activate')}>
-            <Check className="size-4" />
-          </Button>
-        ) : (
-          <Button onClick={() => setStatus.mutate('BLOCKED')} title={t('federation.block')}>
-            <Ban className="size-4" />
-          </Button>
-        )}
-        <ConfirmButton onConfirm={() => remove.mutate()} title={t('federation.remove')}>
-          <Trash2 className="size-4" />
-        </ConfirmButton>
+
+      {/* Freigabe: diesem Server erlauben, UNS fernzuverwalten */}
+      <div className="mt-2 border-t border-border pt-2">
+        <Toggle
+          checked={server.adminGranted}
+          onChange={(v) => grant.mutate(v)}
+          label={t('federation.remote.grantLabel')}
+        />
+        <p className="mt-1 text-xs text-muted">
+          {server.adminAllowed ? t('federation.remote.allowedByPeer') : t('federation.remote.notAllowedByPeer')}
+        </p>
       </div>
+
+      {manage && server.adminAllowed && <RemoteAdminPanel server={server} />}
     </div>
   );
 }

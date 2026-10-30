@@ -248,3 +248,64 @@ describe('Föderation Stufe 1', () => {
     expect(msg?.body).toBe('Via HTTP');
   });
 });
+
+describe('Föderation Fern-Administration', () => {
+  const signedGet = async (path: string) => t.app.inject({ method: 'GET', url: path, headers: await selfSignedHeaders('GET', path) });
+  const signedPost = async (path: string) => t.app.inject({ method: 'POST', url: path, headers: await selfSignedHeaders('POST', path) });
+
+  it('sperrt die Fernverwaltung ohne Freigabe und meldet den Status', async () => {
+    await selfAsPeer(); // adminGranted standardmäßig false
+    expect((await signedGet('/api/federation/admin/overview')).statusCode).toBe(403);
+    const st = await signedGet('/api/federation/admin/status');
+    expect(st.statusCode).toBe(200);
+    expect(st.json().granted).toBe(false);
+  });
+
+  it('liefert nach Freigabe Übersicht und Nutzerliste', async () => {
+    const peer = await selfAsPeer();
+    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { adminGranted: true } });
+
+    const ov = await signedGet('/api/federation/admin/overview');
+    expect(ov.statusCode).toBe(200);
+    expect(ov.json().userCount).toBeGreaterThanOrEqual(2);
+    expect(ov.json().adminCount).toBeGreaterThanOrEqual(1);
+
+    const users = await signedGet('/api/federation/admin/users');
+    expect(users.statusCode).toBe(200);
+    expect(users.json().map((u: { username: string }) => u.username)).toEqual(expect.arrayContaining(['admin', 'bob']));
+
+    const status = await signedGet('/api/federation/admin/status');
+    expect(status.json().granted).toBe(true);
+  });
+
+  it('ändert einen Nutzer per signierter URL und schützt den letzten Admin', async () => {
+    const peer = await selfAsPeer();
+    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { adminGranted: true } });
+    const bob = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'bob' } });
+    const adminUser = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'admin' } });
+
+    const up = await signedPost(`/api/federation/admin/users/${bob.id}?role=UPLOADER`);
+    expect(up.statusCode).toBe(200);
+    expect(up.json().role).toBe('UPLOADER');
+    expect((await t.app.ctx.db.user.findUniqueOrThrow({ where: { id: bob.id } })).role).toBe('UPLOADER');
+
+    // Letzten aktiven Admin nicht herabstufen
+    const demote = await signedPost(`/api/federation/admin/users/${adminUser.id}?role=USER`);
+    expect(demote.statusCode).toBe(400);
+    expect(demote.json().error).toBe('last_admin');
+  });
+
+  it('Hub-Proxy verweigert Fernverwaltung, wenn der Zielserver sie nicht erlaubt', async () => {
+    const peer = await selfAsPeer(); // adminAllowed false
+    await expect(t.app.ctx.federation.remoteOverview(peer.id)).rejects.toThrow();
+  });
+
+  it('spiegelt die Freigabe-Flags in der Server-DTO', async () => {
+    const peer = await selfAsPeer();
+    await t.app.ctx.federation.setAdminGranted(peer.id, true);
+    const list = await t.app.ctx.federation.listServers();
+    const dto = list.find((s) => s.id === peer.id);
+    expect(dto?.adminGranted).toBe(true);
+    expect(dto?.adminAllowed).toBe(false);
+  });
+});

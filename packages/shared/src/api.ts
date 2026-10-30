@@ -119,7 +119,9 @@ import type {
   FederationPeer,
   FederationStatus,
   NetworkGameDto,
+  RemoteAdminOverview,
   RemoteDownloadDto,
+  RemoteUserDto,
 } from './federation.js';
 
 export class ApiError extends Error {
@@ -556,6 +558,12 @@ export class ApiClient {
     sync: (id: string) => this.post<FederatedServerDto>(`/admin/federation/servers/${id}/sync`),
     setStatus: (id: string, status: FederationStatus) => this.patch<FederatedServerDto>(`/admin/federation/servers/${id}`, { status }),
     remove: (id: string) => this.del<{ ok: true }>(`/admin/federation/servers/${id}`),
+    // Fern-Administration (nur wenn der Zielserver sie uns erlaubt bzw. wir sie dem Peer erlauben)
+    setAdminGrant: (id: string, granted: boolean) => this.patch<FederatedServerDto>(`/admin/federation/servers/${id}/admin-grant`, { granted }),
+    remoteOverview: (id: string) => this.get<RemoteAdminOverview>(`/admin/federation/servers/${id}/remote/overview`),
+    remoteUsers: (id: string, q?: string) => this.get<RemoteUserDto[]>(`/admin/federation/servers/${id}/remote/users`, q ? { q } : undefined),
+    remoteUpdateUser: (id: string, userId: string, data: { role?: Role; disabled?: boolean }) =>
+      this.patch<RemoteUserDto>(`/admin/federation/servers/${id}/remote/users/${userId}`, data),
     // Stufe 2: geteilte Accounts
     peers: () => this.get<FederationPeer[]>('/federation/peers'),
     authorizeApprove: (data: { origin: string; redirect: string; state: string }) => this.post<{ redirectUrl: string }>('/federation/authorize/approve', data),

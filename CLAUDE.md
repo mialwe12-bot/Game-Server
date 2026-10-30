@@ -268,8 +268,35 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
   Rollen-Hardcoding NICHT lockern (keine serverübergreifende Admin-Übernahme) – passt zum Security-Grundsatz „keine
   Hintertür". Die zentrale Verwaltung „vom Main-Server aus alle anderen Server" läuft über das Admin-Panel des jeweiligen
   Servers: Föderation (Pairing/Sync/Sperren unter `/admin/federation`), Netzwerk-Katalog (`/network`) und die zentrale
-  Voice-Server-Liste (#21) – jeder Server bleibt dabei souverän (Peer-to-Peer), es gibt bewusst keine Fern-Administration
-  fremder Server-Einstellungen/Nutzer. (Hinweis: „Mailserver" in der Anfrage = vermutlich Autokorrektur für „Main-Server".)
+  Voice-Server-Liste (#21) – jeder Server bleibt dabei souverän (Peer-to-Peer). (Hinweis: „Mailserver" in der Anfrage =
+  vermutlich Autokorrektur für „Main-Server".)
+
+### #22 Echte Fern-Administration anderer Server (opt-in) — umgesetzt (erste Version)
+- Nutzer-Wunsch (per Rückfrage bestätigt): **echte Fern-Administration** — vom Main-Panel aus andere verbundene Server
+  verwalten. Sicherheitsmodell: **beidseitiges Opt-in** — ein Server wird nur fernverwaltet, wenn er den Hub ausdrücklich
+  dazu berechtigt. Kein Server kann einen anderen ohne dessen Zustimmung übernehmen (passt zum „keine-Hintertür"-Grundsatz).
+- **Schema** (Migration `20261030140000_federation_admin`, von Hand): `FederatedServer.adminGranted` (WIR erlauben DIESEM
+  Peer, uns fernzuverwalten) + `adminAllowed` (dieser Peer erlaubt UNS, ihn fernzuverwalten; aus dem Sync zwischengespeichert).
+- **Dienst** `services/federation.ts`: `setAdminGranted`; `verifyPeerAdmin` (verifyPeer + adminGranted-Pflicht);
+  `adminStatusFor` (peer-signiert: `{granted}`); R-Seite `localOverview`/`localUsers`/`localUpdateUser` (Last-Admin-Schutz);
+  Hub-Seite `remoteOverview`/`remoteUsers`/`remoteUpdateUser` (über `requireRemoteAllowed` + `signedFetch`). **Mutationen
+  tragen ihre Parameter in der SIGNIERTEN URL (Query), nicht im unsignierten Body.** `syncOne` ruft zusätzlich
+  `/api/federation/admin/status` und speichert `adminAllowed`. Remote-Avatar bewusst `null` (relativer Pfad lädt am Hub nicht).
+- **Routen** `routes/federation.ts`: peer-signiert `GET /federation/admin/{status,overview,users}`, `POST /federation/admin/users/:id?role&disabled`;
+  Hub/Admin `PATCH /admin/federation/servers/:id/admin-grant`, `GET …/remote/overview`, `GET …/remote/users`,
+  `PATCH …/remote/users/:userId`. Shared: `FederatedServerDto.adminGranted/adminAllowed`, `RemoteAdminOverview`, `RemoteUserDto`;
+  ApiClient `federation.setAdminGrant/remoteOverview/remoteUsers/remoteUpdateUser`.
+- **Web** `pages/admin/FederationPage.tsx`: pro Server Freigabe-Schalter („Diesem Server erlauben, uns fernzuverwalten"),
+  und bei `adminAllowed` ein ⚙-Button „Fernverwalten" → `RemoteAdminPanel` (Übersichtskacheln + Nutzerliste mit Rolle/
+  Deaktivieren). i18n `federation.remote.*` (DE+EN). Server-Zeile auf dem Handy gestapelt (Name nicht mehr abgeschnitten).
+- **Tests**: +5 in `federation.test.ts` (Sperre ohne Freigabe + Status, Übersicht/Nutzer nach Freigabe, Nutzeränderung +
+  Last-Admin-Schutz, Hub-Guard ohne Erlaubnis, DTO-Flags). **Gesamt 139 Server-Tests grün.** Visuell per Playwright geprüft.
+- **Garantie bleibt**: Föderierte/Schatten-Konten sind lokal immer `USER`. Der fernverwaltende Hub-Admin kann die **lokalen**
+  Nutzer des Zielservers verwalten (Rolle inkl. ADMIN, Deaktivierung) — das ist die ausdrücklich erteilte Fern-Admin-Rolle,
+  kein automatischer Cross-Server-Zugriff.
+- **Offen #22**: Fern-**Einstellungen** bearbeiten (bisher nur Übersicht + Nutzer), Fern-Spiele/-Logs, Live-Status der
+  Erlaubnis in der UI ohne Sync-Wartezeit, serverübergreifende Avatare. Body-Signatur für Mutationen (aktuell Parameter in
+  der signierten URL; Body unsigniert wie im übrigen Föderations-Stack).
 
 ### Föderation Stufe 3 (fertig: föderierter Chat / Netzwerk-DMs)
 - Direktnachrichten über Servergrenzen: Nutzer A (Heimat-Server A) schreibt Nutzer R (Heimat-Server B). Auf jeder Seite ist
@@ -359,6 +386,19 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
   gewählt), Secret-Maskierung + Erhalt. Gesamt **134 Server-Tests grün**, Web i18n grün.
 - **Offen #21**: Health-Probe prüft aus Sicht des Servers (nicht des Clients); aktuell neue Beitritte wechseln den Server,
   eine laufende Sitzung wird nicht umgezogen. Kein automatischer Medien-Live-Test in der Sandbox.
+
+### #23 Handy-Optik (Responsive-Fix)
+- **Symptom „alles in PC-Größe auf dem Handy"**: Ursache war **Grid-Blowout**. Tailwind-Zwei-Spalten-Layouts mit nur
+  `grid (lg|md):grid-cols-[…px_1fr]` (ohne Basis `grid-cols-1`) fallen auf dem Handy auf einen **impliziten `auto`-Track**
+  zurück, der auf Inhaltsbreite (max-content) wächst → die ganze Seite wird desktopbreit. Das Admin-Panel rannte so auf
+  **1428px** statt 390px. (Explizite `grid-cols-N` nutzen `minmax(0,1fr)` und blähen nicht auf; der implizite Auto-Track schon.)
+- **Fix**: Basis `grid-cols-1` bei allen responsiven Zwei-Spalten-Grids ergänzt (Store/GamePage, Profil, Bibliothek,
+  Account, Workshop, Suche, Community, Gruppen, Big Picture, Admin-Media, Gruppen-Kartenliste, Home-Feature-Karte).
+  `AdminRoutes` nutzt auf dem Handy `flex flex-col`, erst ab `lg` das Grid. Kopfzeilen-Suche jetzt im Mobil-Menü sichtbar.
+  `main`-Rand wieder `px-4` (das `-mx-4`-Profilbanner braucht 16px Rand).
+- **Verifikation**: Playwright bei 390×844 gegen die Dev-DB (admin/admin-passwort-123), `document.scrollWidth` je Route
+  gemessen – nach dem Fix überläuft **keine** Seite mehr (scrollW=390). Mess-/Shot-Skripte lagen im Scratchpad.
+- **Merke**: Neue Zwei-Spalten-Grids immer mit Basis `grid-cols-1` anlegen.
 
 ## Konventionen
 
