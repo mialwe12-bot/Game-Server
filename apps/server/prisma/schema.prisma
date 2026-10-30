@@ -86,6 +86,8 @@ model User {
   email            String    @unique
   passwordHash     String?
   role             Role      @default(USER)
+  // Netzwerk-Admin: Admin auf allen verbundenen Servern (serverübergreifend). Nur Netzwerk-Admins ernennen weitere.
+  networkAdmin     Boolean   @default(false)
   displayName      String?
   bio              String?
   avatarKey        String?
@@ -1285,9 +1287,6 @@ model FederatedServer {
   lastSyncedAt DateTime?
   lastError    String?
   catalog      Json             @default("[]") // zwischengespeicherter Remote-Katalog (RemoteGameDto[])
-  // Fern-Administration (beidseitiges Opt-in):
-  adminGranted Boolean          @default(false) // WIR erlauben DIESEM Peer, uns fernzuverwalten
-  adminAllowed Boolean          @default(false) // dieser Peer erlaubt UNS, ihn fernzuverwalten (zwischengespeichert aus Sync)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 

@@ -306,6 +306,32 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
   Avatare. Body-Signatur für Mutationen (aktuell Parameter in der signierten URL; Body unsigniert wie im übrigen
   Föderations-Stack). Die Kern-Fern-Administration (Übersicht + Nutzer + Einstellungen) ist umgesetzt.
 
+### #25 Netzwerk-Admin-Rollenmodell (ersetzt das Opt-in) — umgesetzt
+- Nutzer-Entscheidung: **Netzwerk-Admin = Admin auf ALLEN verbundenen Servern, ohne Einzel-Freigabe** (Pairing ist der
+  Vertrauenspunkt; `BLOCKED` bleibt der Notaus). **Nur Netzwerk-Admins ernennen weitere**; der erste per Seed/CLI.
+  Begriff: lokale Rolle `ADMIN` = „Server-Admin" (nur dieser Server); „Netzwerk-Admin" = serverübergreifend.
+- **Schema** (Migration `20261030150000_network_admin`): `User.networkAdmin Boolean @default(false)`; die Opt-in-Spalten
+  `FederatedServer.adminGranted/adminAllowed` **entfernt**.
+- **Auth**: `requireNetworkAdmin` (plugins/auth.ts). Der Admin-preHandler (admin.ts) lässt jetzt **ADMIN ODER networkAdmin**
+  ins Panel (ein Netzwerk-Admin ist auch auf seinem Heimserver Admin). `CurrentUser.networkAdmin`, `AdminUserDto.networkAdmin`,
+  `RemoteUserDto.networkAdmin` ergänzt (dto.ts/admin.ts/federation.ts).
+- **Fern-Admin umgebaut**: Opt-in weg. R-Seite der `/federation/admin/*`-Routen braucht nur noch einen verifizierten,
+  nicht gesperrten Peer (`verifyPeer`, kein `verifyPeerAdmin`/`adminStatusFor`/`setAdminGranted` mehr; `/federation/admin/status`
+  entfernt; `syncOne` ohne adminAllowed). Hub-Seite (`/admin/federation/servers/:id/remote/*`) verlangt `requireNetworkAdmin`;
+  `requireRemoteAllowed` prüft nur noch `status===ACTIVE`. `remoteUpdateUser`/`localUpdateUser` können `networkAdmin` setzen
+  (Parameter in der signierten URL). `admin-grant`-Route entfernt; ApiClient `setAdminGrant` → `setNetworkAdmin`.
+- **Ernennung**: `PATCH /api/admin/users/:id/network-admin` (requireNetworkAdmin, Schutz „letzter Netzwerk-Admin").
+  Bootstrap: `pnpm seed --network-admin …` bzw. `SEED_NETWORK_ADMIN=1` (setzt networkAdmin beim Admin-Seed).
+- **Web**: FederationPage – Opt-in-Toggle entfernt; „Fernverwalten" (⚙) erscheint für **alle ACTIVE-Server**, wenn der
+  angemeldete Nutzer `networkAdmin` ist; RemoteUserRow bekam Netzwerk-Admin-Toggle + Badge. UsersPage: Netzwerk-Admin-Badge
+  + Umschalter (nur für Netzwerk-Admins) im UserModal; `roles.ADMIN` heißt jetzt „Server-Admin". i18n `federation.remote.*`
+  + `admin.usersPage.{networkAdmin,makeNetworkAdmin,revokeNetworkAdmin}` (DE+EN).
+- **Tests** `federation.test.ts` (28, grün): jeder ACTIVE-Peer verwaltbar, BLOCKED-Peer abgewiesen, Nutzeränderung +
+  Last-Admin, Netzwerk-Admin-Ernennung per signierter URL, Einstellungen, Hub-Guard; Rollenmodell-Block (nur Netzwerk-Admins
+  ernennen, Schutz letzter, Netzwerk-Admin-ohne-ADMIN kommt ins Panel).
+- **Sicherheitshinweis**: Das ist eine bewusste, offene Betreiberentscheidung (keine versteckte Hintertür): Wer sich mit
+  einem Server verbindet (Pairing), akzeptiert dessen Netzwerk-Admins als Admins des eigenen Servers; `BLOCKED` trennt sofort.
+
 ### Föderation Stufe 3 (fertig: föderierter Chat / Netzwerk-DMs)
 - Direktnachrichten über Servergrenzen: Nutzer A (Heimat-Server A) schreibt Nutzer R (Heimat-Server B). Auf jeder Seite ist
   die DM eine DIRECT-Konversation zwischen dem lokalen Nutzer und einem **Schatten-Konto** des Remote-Partners.

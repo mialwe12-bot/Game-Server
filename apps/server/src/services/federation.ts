@@ -42,8 +42,6 @@ export function federatedServerDto(s: FederatedServer): FederatedServerDto {
     lastError: s.lastError,
     gameCount: catalog.length,
     createdAt: iso(s.createdAt)!,
-    adminGranted: s.adminGranted,
-    adminAllowed: s.adminAllowed,
   };
 }
 
@@ -61,6 +59,7 @@ export function remoteUserDto(u: User): RemoteUserDto {
     createdAt: iso(u.createdAt)!,
     lastLoginAt: iso(u.lastLoginAt),
     federated: u.federationServerId !== null,
+    networkAdmin: u.networkAdmin,
   };
 }
 
@@ -342,17 +341,9 @@ export class FederationService {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const catalog = (await res.json()) as RemoteGameDto[];
       if (!Array.isArray(catalog)) throw new Error('Ungültige Antwort');
-      // Zusätzlich: erlaubt uns dieser Server die Fernverwaltung? (best effort)
-      let adminAllowed = server.adminAllowed;
-      try {
-        const st = await this.signedFetch(server.baseUrl, 'GET', '/api/federation/admin/status');
-        if (st.ok) adminAllowed = Boolean(((await st.json()) as { granted?: boolean })?.granted);
-      } catch {
-        /* Peer kennt die Route evtl. nicht – alten Wert behalten */
-      }
       await this.ctx.db.federatedServer.update({
         where: { id },
-        data: { catalog: catalog as unknown as object, lastSyncedAt: new Date(), lastError: null, adminAllowed },
+        data: { catalog: catalog as unknown as object, lastSyncedAt: new Date(), lastError: null },
       });
     } catch (err) {
       await this.ctx.db.federatedServer.update({ where: { id }, data: { lastError: String(err instanceof Error ? err.message : err) } });
@@ -577,33 +568,14 @@ export class FederationService {
   }
 
   // ---------------------------------------------------------------------------
-  // Fern-Administration (beidseitiges Opt-in)
+  // Fern-Administration (Netzwerk-Admin-Modell)
   //
-  // Ein Server kann nur fernverwaltet werden, wenn er den Hub ausdrücklich dazu
-  // berechtigt (adminGranted auf seiner Seite). Der Hub lernt diese Erlaubnis beim
-  // Sync (adminAllowed) und kann dann über peer-signierte /federation/admin/*-Routen
-  // Übersicht und Nutzer des Peers verwalten. Mutationen tragen ihre Parameter in der
-  // signierten URL (Query), nicht im unsignierten Body.
+  // Jeder ACTIVE-Server im Verbund kann fernverwaltet werden; die Berechtigung liegt
+  // beim aufrufenden Nutzer (Netzwerk-Admin, auf der Hub-Seite geprüft), nicht mehr
+  // pro Server (kein Einzel-Opt-in; BLOCKED bleibt der Notaus). R-seitig reicht ein
+  // verifizierter, nicht gesperrter Peer (verifyPeer). Mutationen tragen ihre Parameter
+  // in der signierten URL (Query), nicht im unsignierten Body.
   // ---------------------------------------------------------------------------
-
-  /** Wir erlauben/entziehen diesem Peer die Fernverwaltung über uns. */
-  async setAdminGranted(id: string, granted: boolean): Promise<FederatedServerDto> {
-    const server = await this.ctx.db.federatedServer.update({ where: { id }, data: { adminGranted: granted } });
-    return federatedServerDto(server);
-  }
-
-  /** Peer-signiert: verifiziert den Aufrufer UND prüft, dass er uns fernverwalten darf. */
-  async verifyPeerAdmin(headers: Record<string, unknown>, method: string, pathWithQuery: string): Promise<FederatedServer> {
-    const peer = await this.verifyPeer(headers, method, pathWithQuery);
-    if (!peer.adminGranted) throw forbidden('Dieser Server hat keine Fernverwaltung erlaubt', 'federation_admin_denied');
-    return peer;
-  }
-
-  /** Peer-signiert: meldet dem aufrufenden Hub, ob er uns fernverwalten darf. */
-  async adminStatusFor(headers: Record<string, unknown>, method: string, pathWithQuery: string): Promise<{ granted: boolean }> {
-    const peer = await this.verifyPeer(headers, method, pathWithQuery);
-    return { granted: peer.adminGranted };
-  }
 
   /** R-Seite: kompakte Übersicht dieses Servers (für die Fernverwaltung). */
   async localOverview(): Promise<RemoteAdminOverview> {
@@ -637,8 +609,8 @@ export class FederationService {
     return users.map((u) => remoteUserDto(u));
   }
 
-  /** R-Seite: Rolle/Deaktivierung eines Nutzers ändern (Last-Admin-Schutz). */
-  async localUpdateUser(id: string, data: { role?: Role; disabled?: boolean }): Promise<RemoteUserDto> {
+  /** R-Seite: Rolle/Deaktivierung/Netzwerk-Admin eines Nutzers ändern (Last-Admin-Schutz). */
+  async localUpdateUser(id: string, data: { role?: Role; disabled?: boolean; networkAdmin?: boolean }): Promise<RemoteUserDto> {
     const target = await this.ctx.db.user.findUnique({ where: { id } });
     if (!target) throw notFound('Nutzer nicht gefunden');
     // Letzten aktiven Admin nicht herabstufen/deaktivieren
@@ -649,16 +621,19 @@ export class FederationService {
     }
     const updated = await this.ctx.db.user.update({
       where: { id },
-      data: { ...(data.role ? { role: data.role } : {}), ...(data.disabled !== undefined ? { disabled: data.disabled } : {}) },
+      data: {
+        ...(data.role ? { role: data.role } : {}),
+        ...(data.disabled !== undefined ? { disabled: data.disabled } : {}),
+        ...(data.networkAdmin !== undefined ? { networkAdmin: data.networkAdmin } : {}),
+      },
     });
     return remoteUserDto(updated);
   }
 
-  /** Hub-Seite: prüft, dass uns der Zielserver die Fernverwaltung erlaubt. */
+  /** Hub-Seite: Zielserver muss verbunden und ACTIVE sein (BLOCKED = Notaus; kein Einzel-Opt-in mehr). */
   private async requireRemoteAllowed(serverId: string): Promise<FederatedServer> {
     const s = await this.ctx.db.federatedServer.findUnique({ where: { id: serverId } });
     if (!s || s.status !== 'ACTIVE') throw notFound('Server nicht gefunden');
-    if (!s.adminAllowed) throw forbidden('Dieser Server erlaubt dir keine Fernverwaltung', 'federation_admin_not_allowed');
     return s;
   }
 
@@ -684,10 +659,11 @@ export class FederationService {
   }
 
   /** Hub-Seite: Nutzer eines fernverwalteten Servers ändern (Parameter in der signierten URL). */
-  remoteUpdateUser(serverId: string, userId: string, data: { role?: Role; disabled?: boolean }): Promise<RemoteUserDto> {
+  remoteUpdateUser(serverId: string, userId: string, data: { role?: Role; disabled?: boolean; networkAdmin?: boolean }): Promise<RemoteUserDto> {
     const params = new URLSearchParams();
     if (data.role) params.set('role', data.role);
     if (data.disabled !== undefined) params.set('disabled', String(data.disabled));
+    if (data.networkAdmin !== undefined) params.set('networkAdmin', String(data.networkAdmin));
     return this.remoteJson<RemoteUserDto>(serverId, 'POST', `/api/federation/admin/users/${encodeURIComponent(userId)}?${params.toString()}`);
   }
 

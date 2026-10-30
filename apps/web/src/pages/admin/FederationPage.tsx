@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { FederatedServerDto, FederationPairingCode, FederationStatus, RegistrationMode, RemoteSettingsDto, RemoteUserDto, Role } from '@gameserver/shared';
 import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageLoader, Select, Textarea, Toggle } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { formatBytes, formatDate } from '../../lib/format';
 import { toast } from '../../lib/toast';
 
@@ -28,11 +29,11 @@ function statusTone(s: FederationStatus): 'success' | 'warning' | 'danger' {
   return s === 'ACTIVE' ? 'success' : s === 'BLOCKED' ? 'danger' : 'warning';
 }
 
-/** Nutzerzeile im Fernverwaltungs-Panel: Rolle + Deaktivierung ändern. */
+/** Nutzerzeile im Fernverwaltungs-Panel: Rolle + Deaktivierung + Netzwerk-Admin ändern. */
 function RemoteUserRow({ serverId, u, onChange }: { serverId: string; u: RemoteUserDto; onChange: () => void }) {
   const { t } = useTranslation();
   const update = useMutation({
-    mutationFn: (data: { role?: Role; disabled?: boolean }) => api.federation.remoteUpdateUser(serverId, u.id, data),
+    mutationFn: (data: { role?: Role; disabled?: boolean; networkAdmin?: boolean }) => api.federation.remoteUpdateUser(serverId, u.id, data),
     onSuccess: onChange,
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -41,16 +42,20 @@ function RemoteUserRow({ serverId, u, onChange }: { serverId: string; u: RemoteU
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate font-medium">{u.displayName || u.username}</span>
+          {u.networkAdmin && <Badge tone="accent">{t('federation.remote.networkAdmin')}</Badge>}
           {u.federated && <Badge tone="warning">{t('federation.remote.federatedUser')}</Badge>}
           {u.disabled && <Badge tone="danger">{t('federation.remote.disabled')}</Badge>}
         </div>
         <div className="truncate text-xs text-muted">{u.email}</div>
       </div>
-      <Select value={u.role} onChange={(e) => update.mutate({ role: e.target.value as Role })} disabled={update.isPending} className="w-36">
+      <Select value={u.role} onChange={(e) => update.mutate({ role: e.target.value as Role })} disabled={update.isPending} className="w-36" title={t('federation.remote.serverAdminHint')}>
         <option value="USER">USER</option>
         <option value="UPLOADER">UPLOADER</option>
-        <option value="ADMIN">ADMIN</option>
+        <option value="ADMIN">{t('federation.remote.roleServerAdmin')}</option>
       </Select>
+      <Button onClick={() => update.mutate({ networkAdmin: !u.networkAdmin })} disabled={update.isPending}>
+        {u.networkAdmin ? t('federation.remote.revokeNetworkAdmin') : t('federation.remote.makeNetworkAdmin')}
+      </Button>
       <Button onClick={() => update.mutate({ disabled: !u.disabled })} disabled={update.isPending}>
         {u.disabled ? t('federation.remote.enable') : t('federation.remote.disable')}
       </Button>
@@ -192,7 +197,7 @@ function RemoteAdminPanel({ server }: { server: FederatedServerDto }) {
   );
 }
 
-function ServerRow({ server, onChange }: { server: FederatedServerDto; onChange: () => void }) {
+function ServerRow({ server, canManage, onChange }: { server: FederatedServerDto; canManage: boolean; onChange: () => void }) {
   const { t } = useTranslation();
   const [manage, setManage] = useState(false);
   const sync = useMutation({ mutationFn: () => api.federation.sync(server.id), onSuccess: onChange, onError: (e) => toast.error(errorMessage(e)) });
@@ -201,12 +206,9 @@ function ServerRow({ server, onChange }: { server: FederatedServerDto; onChange:
     onSuccess: onChange,
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const grant = useMutation({
-    mutationFn: (granted: boolean) => api.federation.setAdminGrant(server.id, granted),
-    onSuccess: onChange,
-    onError: (e) => toast.error(errorMessage(e)),
-  });
   const remove = useMutation({ mutationFn: () => api.federation.remove(server.id), onSuccess: onChange, onError: (e) => toast.error(errorMessage(e)) });
+  // Fernverwalten: nur Netzwerk-Admins, nur ACTIVE-Server (BLOCKED = Notaus).
+  const manageable = canManage && server.status === 'ACTIVE';
 
   return (
     <div className="rounded-lg border border-border p-3">
@@ -225,7 +227,7 @@ function ServerRow({ server, onChange }: { server: FederatedServerDto; onChange:
           </div>
         </div>
         <div className="flex gap-2">
-          {server.adminAllowed && (
+          {manageable && (
             <Button variant={manage ? 'primary' : 'secondary'} onClick={() => setManage((m) => !m)} title={t('federation.remote.manage')}>
               <ServerCog className="size-4" />
             </Button>
@@ -248,19 +250,7 @@ function ServerRow({ server, onChange }: { server: FederatedServerDto; onChange:
         </div>
       </div>
 
-      {/* Freigabe: diesem Server erlauben, UNS fernzuverwalten */}
-      <div className="mt-2 border-t border-border pt-2">
-        <Toggle
-          checked={server.adminGranted}
-          onChange={(v) => grant.mutate(v)}
-          label={t('federation.remote.grantLabel')}
-        />
-        <p className="mt-1 text-xs text-muted">
-          {server.adminAllowed ? t('federation.remote.allowedByPeer') : t('federation.remote.notAllowedByPeer')}
-        </p>
-      </div>
-
-      {manage && server.adminAllowed && <RemoteAdminPanel server={server} />}
+      {manage && manageable && <RemoteAdminPanel server={server} />}
     </div>
   );
 }
@@ -268,6 +258,8 @@ function ServerRow({ server, onChange }: { server: FederatedServerDto; onChange:
 export default function FederationPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canManage = !!user?.networkAdmin;
   const self = useQuery({ queryKey: ['fed', 'self'], queryFn: () => api.federation.self() });
   const servers = useQuery({ queryKey: ['fed', 'servers'], queryFn: () => api.federation.servers() });
   const [code, setCode] = useState<FederationPairingCode | null>(null);
@@ -343,7 +335,7 @@ export default function FederationPage() {
         {servers.data && servers.data.length > 0 ? (
           <div className="space-y-2">
             {servers.data.map((s) => (
-              <ServerRow key={s.id} server={s} onChange={refresh} />
+              <ServerRow key={s.id} server={s} canManage={canManage} onChange={refresh} />
             ))}
           </div>
         ) : (

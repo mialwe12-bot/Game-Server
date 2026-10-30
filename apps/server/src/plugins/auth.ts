@@ -68,3 +68,10 @@ export function requireRole(req: FastifyRequest, ...roles: Role[]): AuthInfo {
 }
 
 export const requireAdmin = (req: FastifyRequest) => requireRole(req, 'ADMIN');
+
+/** Netzwerk-Admin: darf serverübergreifend (Fern-)Administration ausführen und weitere Netzwerk-Admins ernennen. */
+export function requireNetworkAdmin(req: FastifyRequest): AuthInfo {
+  const auth = requireAuth(req);
+  if (!auth.user.networkAdmin) throw forbidden('Nur für Netzwerk-Admins', 'network_admin_required');
+  return auth;
+}

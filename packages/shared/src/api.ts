@@ -513,6 +513,7 @@ export class ApiClient {
     users: (q: { q?: string; role?: Role; page?: number; pageSize?: number } = {}) => this.get<Paginated<AdminUserDto>>('/admin/users', q as Query),
     createUser: (data: { username: string; email: string; password: string; role: Role }) => this.post<AdminUserDto>('/admin/users', data),
     updateUser: (id: string, data: AdminUserUpdate) => this.patch<AdminUserDto>(`/admin/users/${id}`, data),
+    setNetworkAdmin: (id: string, networkAdmin: boolean) => this.patch<AdminUserDto>(`/admin/users/${id}/network-admin`, { networkAdmin }),
     deleteUser: (id: string) => this.del<{ ok: true }>(`/admin/users/${id}`),
     userSessions: (id: string) => this.get<SessionInfo[]>(`/admin/users/${id}/sessions`),
     revokeUserSession: (id: string, sessionId: string) => this.del<{ ok: true }>(`/admin/users/${id}/sessions/${sessionId}`),
@@ -559,11 +560,10 @@ export class ApiClient {
     sync: (id: string) => this.post<FederatedServerDto>(`/admin/federation/servers/${id}/sync`),
     setStatus: (id: string, status: FederationStatus) => this.patch<FederatedServerDto>(`/admin/federation/servers/${id}`, { status }),
     remove: (id: string) => this.del<{ ok: true }>(`/admin/federation/servers/${id}`),
-    // Fern-Administration (nur wenn der Zielserver sie uns erlaubt bzw. wir sie dem Peer erlauben)
-    setAdminGrant: (id: string, granted: boolean) => this.patch<FederatedServerDto>(`/admin/federation/servers/${id}/admin-grant`, { granted }),
+    // Fern-Administration (nur für Netzwerk-Admins; jeder ACTIVE-Server im Verbund ist verwaltbar)
     remoteOverview: (id: string) => this.get<RemoteAdminOverview>(`/admin/federation/servers/${id}/remote/overview`),
     remoteUsers: (id: string, q?: string) => this.get<RemoteUserDto[]>(`/admin/federation/servers/${id}/remote/users`, q ? { q } : undefined),
-    remoteUpdateUser: (id: string, userId: string, data: { role?: Role; disabled?: boolean }) =>
+    remoteUpdateUser: (id: string, userId: string, data: { role?: Role; disabled?: boolean; networkAdmin?: boolean }) =>
       this.patch<RemoteUserDto>(`/admin/federation/servers/${id}/remote/users/${userId}`, data),
     remoteSettings: (id: string) => this.get<RemoteSettingsDto>(`/admin/federation/servers/${id}/remote/settings`),
     remoteUpdateSettings: (id: string, patch: Partial<RemoteSettingsDto>) =>

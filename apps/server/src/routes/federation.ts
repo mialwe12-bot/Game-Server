@@ -11,7 +11,7 @@ import type {
   RemoteSettingsDto,
   RemoteUserDto,
 } from '@gameserver/shared';
-import { requireAdmin, requireAuth } from '../plugins/auth.js';
+import { requireAdmin, requireAuth, requireNetworkAdmin } from '../plugins/auth.js';
 import { notFound } from '../lib/errors.js';
 import { iso } from '../lib/time.js';
 
@@ -113,14 +113,10 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
-  // --- Fern-Administration, R-Seite (peer-signiert, nur wenn adminGranted) ---
+  // --- Fern-Administration, R-Seite (peer-signiert; jeder ACTIVE-Peer, Berechtigung liegt beim Netzwerk-Admin auf der Hub-Seite) ---
   // Mutationen tragen ihre Parameter in der signierten URL (Query), nicht im unsignierten Body.
-  app.get('/federation/admin/status', { schema: { tags: ['federation'], summary: 'Darf der aufrufende Server uns fernverwalten?' }, config: { skipCsrf: true } }, async (req) =>
-    fed.adminStatusFor(req.headers as Record<string, unknown>, req.method, req.url),
-  );
-
   app.get('/federation/admin/overview', { schema: { tags: ['federation'], summary: 'Übersicht für die Fernverwaltung' }, config: { skipCsrf: true } }, async (req): Promise<RemoteAdminOverview> => {
-    await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+    await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
     return fed.localOverview();
   });
 
@@ -128,7 +124,7 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     '/federation/admin/users',
     { schema: { tags: ['federation'], summary: 'Nutzerliste für die Fernverwaltung', querystring: z.object({ q: z.string().trim().max(100).optional() }) }, config: { skipCsrf: true } },
     async (req): Promise<RemoteUserDto[]> => {
-      await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
       return fed.localUsers(req.query.q);
     },
   );
@@ -140,19 +136,24 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ['federation'],
         summary: 'Nutzer per Fernverwaltung ändern',
         params: z.object({ id: z.string() }),
-        querystring: z.object({ role: z.enum(['ADMIN', 'UPLOADER', 'USER']).optional(), disabled: z.enum(['true', 'false']).optional() }),
+        querystring: z.object({
+          role: z.enum(['ADMIN', 'UPLOADER', 'USER']).optional(),
+          disabled: z.enum(['true', 'false']).optional(),
+          networkAdmin: z.enum(['true', 'false']).optional(),
+        }),
       },
       config: { skipCsrf: true },
     },
     async (req): Promise<RemoteUserDto> => {
-      await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
       const disabled = req.query.disabled === undefined ? undefined : req.query.disabled === 'true';
-      return fed.localUpdateUser(req.params.id, { role: req.query.role, disabled });
+      const networkAdmin = req.query.networkAdmin === undefined ? undefined : req.query.networkAdmin === 'true';
+      return fed.localUpdateUser(req.params.id, { role: req.query.role, disabled, networkAdmin });
     },
   );
 
   app.get('/federation/admin/settings', { schema: { tags: ['federation'], summary: 'Betriebseinstellungen für die Fernverwaltung' }, config: { skipCsrf: true } }, async (req): Promise<RemoteSettingsDto> => {
-    await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+    await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
     return fed.localSettings();
   });
 
@@ -174,7 +175,7 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
       config: { skipCsrf: true },
     },
     async (req): Promise<RemoteSettingsDto> => {
-      await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
       const q = req.query;
       return fed.localUpdateSettings({
         siteName: q.siteName,
@@ -267,20 +268,9 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     return { ok: true };
   });
 
-  // --- Fern-Administration, Hub-Seite (lokaler Admin steuert verbundene Server) ---
-  app.patch(
-    '/admin/federation/servers/:id/admin-grant',
-    { schema: { tags: ['federation'], summary: 'Diesem Server die Fernverwaltung über uns erlauben/entziehen', params: z.object({ id: z.string() }), body: z.object({ granted: z.boolean() }) } },
-    async (req): Promise<FederatedServerDto> => {
-      requireAdmin(req);
-      const server = await fed.setAdminGranted(req.params.id, req.body.granted);
-      await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.admin_grant', target: req.params.id, meta: { granted: req.body.granted }, ip: req.ip });
-      return server;
-    },
-  );
-
+  // --- Fern-Administration, Hub-Seite (nur Netzwerk-Admins; jeder ACTIVE-Server im Verbund) ---
   app.get('/admin/federation/servers/:id/remote/overview', { schema: { tags: ['federation'], summary: 'Übersicht eines fernverwalteten Servers', params: z.object({ id: z.string() }) } }, async (req): Promise<RemoteAdminOverview> => {
-    requireAdmin(req);
+    requireNetworkAdmin(req);
     return fed.remoteOverview(req.params.id);
   });
 
@@ -288,7 +278,7 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     '/admin/federation/servers/:id/remote/users',
     { schema: { tags: ['federation'], summary: 'Nutzer eines fernverwalteten Servers', params: z.object({ id: z.string() }), querystring: z.object({ q: z.string().trim().max(100).optional() }) } },
     async (req): Promise<RemoteUserDto[]> => {
-      requireAdmin(req);
+      requireNetworkAdmin(req);
       return fed.remoteUsers(req.params.id, req.query.q);
     },
   );
@@ -300,11 +290,11 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
         tags: ['federation'],
         summary: 'Nutzer eines fernverwalteten Servers ändern',
         params: z.object({ id: z.string(), userId: z.string() }),
-        body: z.object({ role: z.enum(['ADMIN', 'UPLOADER', 'USER']).optional(), disabled: z.boolean().optional() }),
+        body: z.object({ role: z.enum(['ADMIN', 'UPLOADER', 'USER']).optional(), disabled: z.boolean().optional(), networkAdmin: z.boolean().optional() }),
       },
     },
     async (req): Promise<RemoteUserDto> => {
-      requireAdmin(req);
+      requireNetworkAdmin(req);
       const server = await fed.remoteUpdateUser(req.params.id, req.params.userId, req.body);
       await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_user_update', target: req.params.id, meta: { userId: req.params.userId, ...req.body }, ip: req.ip });
       return server;
@@ -312,7 +302,7 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
   );
 
   app.get('/admin/federation/servers/:id/remote/settings', { schema: { tags: ['federation'], summary: 'Betriebseinstellungen eines fernverwalteten Servers', params: z.object({ id: z.string() }) } }, async (req): Promise<RemoteSettingsDto> => {
-    requireAdmin(req);
+    requireNetworkAdmin(req);
     return fed.remoteSettings(req.params.id);
   });
 
@@ -334,7 +324,7 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (req): Promise<RemoteSettingsDto> => {
-      requireAdmin(req);
+      requireNetworkAdmin(req);
       const server = await fed.remoteUpdateSettings(req.params.id, req.body);
       await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_settings_update', target: req.params.id, meta: req.body, ip: req.ip });
       return server;

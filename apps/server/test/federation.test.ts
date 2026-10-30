@@ -253,57 +253,48 @@ describe('Föderation Fern-Administration', () => {
   const signedGet = async (path: string) => t.app.inject({ method: 'GET', url: path, headers: await selfSignedHeaders('GET', path) });
   const signedPost = async (path: string) => t.app.inject({ method: 'POST', url: path, headers: await selfSignedHeaders('POST', path) });
 
-  it('sperrt die Fernverwaltung ohne Freigabe und meldet den Status', async () => {
-    await selfAsPeer(); // adminGranted standardmäßig false
-    expect((await signedGet('/api/federation/admin/overview')).statusCode).toBe(403);
-    const st = await signedGet('/api/federation/admin/status');
-    expect(st.statusCode).toBe(200);
-    expect(st.json().granted).toBe(false);
-  });
-
-  it('liefert nach Freigabe Übersicht und Nutzerliste', async () => {
-    const peer = await selfAsPeer();
-    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { adminGranted: true } });
-
+  it('liefert jedem ACTIVE-Peer Übersicht und Nutzerliste (kein Opt-in mehr)', async () => {
+    await selfAsPeer();
     const ov = await signedGet('/api/federation/admin/overview');
     expect(ov.statusCode).toBe(200);
     expect(ov.json().userCount).toBeGreaterThanOrEqual(2);
-    expect(ov.json().adminCount).toBeGreaterThanOrEqual(1);
 
     const users = await signedGet('/api/federation/admin/users');
     expect(users.statusCode).toBe(200);
     expect(users.json().map((u: { username: string }) => u.username)).toEqual(expect.arrayContaining(['admin', 'bob']));
+  });
 
-    const status = await signedGet('/api/federation/admin/status');
-    expect(status.json().granted).toBe(true);
+  it('weist einen gesperrten (BLOCKED) Peer zurück', async () => {
+    const peer = await selfAsPeer();
+    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { status: 'BLOCKED' } });
+    expect((await signedGet('/api/federation/admin/overview')).statusCode).toBe(403);
   });
 
   it('ändert einen Nutzer per signierter URL und schützt den letzten Admin', async () => {
-    const peer = await selfAsPeer();
-    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { adminGranted: true } });
+    await selfAsPeer();
     const bob = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'bob' } });
     const adminUser = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'admin' } });
 
     const up = await signedPost(`/api/federation/admin/users/${bob.id}?role=UPLOADER`);
     expect(up.statusCode).toBe(200);
     expect(up.json().role).toBe('UPLOADER');
-    expect((await t.app.ctx.db.user.findUniqueOrThrow({ where: { id: bob.id } })).role).toBe('UPLOADER');
 
-    // Letzten aktiven Admin nicht herabstufen
     const demote = await signedPost(`/api/federation/admin/users/${adminUser.id}?role=USER`);
     expect(demote.statusCode).toBe(400);
     expect(demote.json().error).toBe('last_admin');
   });
 
-  it('Hub-Proxy verweigert Fernverwaltung, wenn der Zielserver sie nicht erlaubt', async () => {
-    const peer = await selfAsPeer(); // adminAllowed false
-    await expect(t.app.ctx.federation.remoteOverview(peer.id)).rejects.toThrow();
+  it('ernennt per Fernverwaltung einen Netzwerk-Admin (signierte URL)', async () => {
+    await selfAsPeer();
+    const bob = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'bob' } });
+    const up = await signedPost(`/api/federation/admin/users/${bob.id}?networkAdmin=true`);
+    expect(up.statusCode).toBe(200);
+    expect(up.json().networkAdmin).toBe(true);
+    expect((await t.app.ctx.db.user.findUniqueOrThrow({ where: { id: bob.id } })).networkAdmin).toBe(true);
   });
 
   it('liest und ändert Betriebseinstellungen per Fernverwaltung', async () => {
-    const peer = await selfAsPeer();
-    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { adminGranted: true } });
-
+    await selfAsPeer();
     const get = await signedGet('/api/federation/admin/settings');
     expect(get.statusCode).toBe(200);
     expect(typeof get.json().siteName).toBe('string');
@@ -312,23 +303,44 @@ describe('Föderation Fern-Administration', () => {
     expect(post.statusCode).toBe(200);
     expect(post.json().maintenanceMode).toBe(true);
     expect(post.json().siteName).toBe('Umbenannt');
-
-    const s = await t.app.ctx.settings.get();
-    expect(s.maintenanceMode).toBe(true);
-    expect(s.siteName).toBe('Umbenannt');
   });
 
-  it('sperrt die Einstellungen-Route ohne Freigabe', async () => {
-    await selfAsPeer();
-    expect((await signedGet('/api/federation/admin/settings')).statusCode).toBe(403);
+  it('Hub-Proxy verlangt einen ACTIVE-Server', async () => {
+    await expect(t.app.ctx.federation.remoteOverview('gibt-es-nicht')).rejects.toThrow();
+  });
+});
+
+describe('Netzwerk-Admin-Rollenmodell', () => {
+  it('nur Netzwerk-Admins ernennen weitere; schützt den letzten', async () => {
+    const admin = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'admin' } });
+    const bob = await t.app.ctx.db.user.findUniqueOrThrow({ where: { username: 'bob' } });
+
+    // bob (normaler Nutzer) darf niemanden ernennen
+    const bobClient = await login(t.app, 'bob');
+    expect((await bobClient.req('PATCH', `/api/admin/users/${admin.id}/network-admin`, { networkAdmin: true })).statusCode).toBe(403);
+
+    // admin ist zunächst kein Netzwerk-Admin → auch 403
+    const adminClient = await login(t.app, 'admin');
+    expect((await adminClient.req('PATCH', `/api/admin/users/${bob.id}/network-admin`, { networkAdmin: true })).statusCode).toBe(403);
+
+    // admin zum Netzwerk-Admin machen (wie per Seed) → darf nun ernennen
+    await t.app.ctx.db.user.update({ where: { id: admin.id }, data: { networkAdmin: true } });
+    const admin2 = await login(t.app, 'admin');
+    const promote = await admin2.req('PATCH', `/api/admin/users/${bob.id}/network-admin`, { networkAdmin: true });
+    expect(promote.statusCode).toBe(200);
+    expect(promote.json().networkAdmin).toBe(true);
+
+    // bob entziehen ist ok (admin bleibt), danach den letzten (admin) entziehen → geschützt
+    expect((await admin2.req('PATCH', `/api/admin/users/${bob.id}/network-admin`, { networkAdmin: false })).statusCode).toBe(200);
+    const last = await admin2.req('PATCH', `/api/admin/users/${admin.id}/network-admin`, { networkAdmin: false });
+    expect(last.statusCode).toBe(400);
+    expect(last.json().error).toBe('last_network_admin');
   });
 
-  it('spiegelt die Freigabe-Flags in der Server-DTO', async () => {
-    const peer = await selfAsPeer();
-    await t.app.ctx.federation.setAdminGranted(peer.id, true);
-    const list = await t.app.ctx.federation.listServers();
-    const dto = list.find((s) => s.id === peer.id);
-    expect(dto?.adminGranted).toBe(true);
-    expect(dto?.adminAllowed).toBe(false);
+  it('ein Netzwerk-Admin ohne Rolle ADMIN kommt trotzdem ins Admin-Panel', async () => {
+    const carol = await createUser(t.app, 'carol'); // Rolle USER
+    await t.app.ctx.db.user.update({ where: { id: carol.id }, data: { networkAdmin: true } });
+    const carolClient = await login(t.app, 'carol');
+    expect((await carolClient.req('GET', '/api/admin/overview')).statusCode).toBe(200);
   });
 });

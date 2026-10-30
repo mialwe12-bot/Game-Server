@@ -49,10 +49,6 @@ export interface FederatedServerDto {
   lastError: string | null;
   gameCount: number;
   createdAt: string;
-  /** Wir erlauben diesem Peer, uns fernzuverwalten. */
-  adminGranted: boolean;
-  /** Dieser Peer erlaubt uns, ihn fernzuverwalten (zwischengespeichert aus dem Sync). */
-  adminAllowed: boolean;
 }
 
 /** Kompakte Übersicht eines fernverwalteten Servers. */
@@ -90,6 +86,8 @@ export interface RemoteUserDto {
   lastLoginAt: string | null;
   /** Schatten-Konto (von einem weiteren Server föderiert). */
   federated: boolean;
+  /** Netzwerk-Admin: Admin auf allen verbundenen Servern. */
+  networkAdmin: boolean;
 }
 
 /** Vom Admin erzeugter Pairing-Code zum Verbinden eines zweiten Servers. */

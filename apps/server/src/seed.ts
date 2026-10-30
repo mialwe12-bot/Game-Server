@@ -20,6 +20,7 @@ const { values } = parseArgs({
     email: { type: 'string' },
     password: { type: 'string' },
     demo: { type: 'boolean', default: false },
+    'network-admin': { type: 'boolean', default: false },
   },
   allowPositionals: true,
 });
@@ -59,14 +60,18 @@ async function main() {
     if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Ungültige E-Mail-Adresse');
     if (password.length < 10) throw new Error('Passwort muss mindestens 10 Zeichen haben');
 
+    // Netzwerk-Admin: Admin auf allen verbundenen Servern. Per --network-admin oder SEED_NETWORK_ADMIN=1 setzen
+    // (so wird der erste Netzwerk-Admin eingerichtet; danach ernennen Netzwerk-Admins weitere im Panel).
+    const networkAdmin = values['network-admin'] === true || ['1', 'true', 'yes'].includes((process.env.SEED_NETWORK_ADMIN ?? '').toLowerCase());
+
     const passwordHash = await hashPassword(password);
     const existing = await db.user.findFirst({ where: { OR: [{ username: { equals: username, mode: 'insensitive' } }, { email: email.toLowerCase() }] } });
     if (existing) {
-      await db.user.update({ where: { id: existing.id }, data: { role: 'ADMIN', passwordHash, disabled: false } });
-      console.log(`✔ Bestehender Nutzer "${existing.username}" ist jetzt Admin, Passwort wurde gesetzt.`);
+      await db.user.update({ where: { id: existing.id }, data: { role: 'ADMIN', passwordHash, disabled: false, ...(networkAdmin ? { networkAdmin: true } : {}) } });
+      console.log(`✔ Bestehender Nutzer "${existing.username}" ist jetzt Admin${networkAdmin ? ' + Netzwerk-Admin' : ''}, Passwort wurde gesetzt.`);
     } else {
-      await db.user.create({ data: { username, email: email.toLowerCase(), passwordHash, role: 'ADMIN' } });
-      console.log(`✔ Admin "${username}" wurde angelegt.`);
+      await db.user.create({ data: { username, email: email.toLowerCase(), passwordHash, role: 'ADMIN', networkAdmin } });
+      console.log(`✔ Admin "${username}"${networkAdmin ? ' (Netzwerk-Admin)' : ''} wurde angelegt.`);
     }
 
     const genres = ['Action', 'Adventure', 'RPG', 'Strategy', 'Simulation', 'Puzzle', 'Platformer', 'Shooter', 'Racing', 'Indie', 'Casual', 'Sports'];

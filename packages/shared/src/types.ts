@@ -42,6 +42,8 @@ export interface CurrentUser extends UserPublic {
   totpEnabled: boolean;
   hasPassword: boolean;
   oidcLinked: boolean;
+  /** Netzwerk-Admin: Admin auf allen verbundenen Servern. */
+  networkAdmin: boolean;
 }
 
 export interface AuthSuccess {
@@ -407,6 +409,8 @@ export interface AdminUserDto extends UserPublic {
   uploadQuotaBytes: number | null;
   usedUploadBytes: number;
   libraryCount: number;
+  /** Netzwerk-Admin: Admin auf allen verbundenen Servern. */
+  networkAdmin: boolean;
 }
 
 export interface StorageOverview {

@@ -28,6 +28,11 @@ function UserModal({ user, onClose }: { user: AdminUserDto; onClose: () => void 
     onSuccess: done,
     onError: (e) => toast.error(errorMessage(e)),
   });
+  const netAdmin = useMutation({
+    mutationFn: (v: boolean) => api.admin.setNetworkAdmin(user.id, v),
+    onSuccess: done,
+    onError: (e) => toast.error(errorMessage(e)),
+  });
 
   return (
     <Modal open onClose={onClose} title={user.username} wide>
@@ -61,6 +66,11 @@ function UserModal({ user, onClose }: { user: AdminUserDto; onClose: () => void 
             </Button>
           )}
           {user.totpEnabled && <ConfirmButton onConfirm={() => update.mutate({ resetTotp: true })}>{t('admin.usersPage.reset2fa')}</ConfirmButton>}
+          {me?.networkAdmin && (
+            <ConfirmButton onConfirm={() => netAdmin.mutate(!user.networkAdmin)}>
+              {user.networkAdmin ? t('admin.usersPage.revokeNetworkAdmin') : t('admin.usersPage.makeNetworkAdmin')}
+            </ConfirmButton>
+          )}
           {user.id !== me?.id && (
             <ConfirmButton
               onConfirm={() =>
@@ -221,6 +231,7 @@ export default function UsersPage() {
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">
                         <Badge tone={u.role === 'ADMIN' ? 'accent' : 'default'}>{t(`roles.${u.role}`)}</Badge>
+                        {u.networkAdmin && <Badge tone="accent">{t('admin.usersPage.networkAdmin')}</Badge>}
                         {u.disabled && <Badge tone="danger">{t('admin.usersPage.disabled')}</Badge>}
                         {u.totpEnabled && <Badge tone="success">2FA</Badge>}
                       </div>

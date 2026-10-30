@@ -50,6 +50,7 @@ export function currentUser(user: User): CurrentUser {
     totpEnabled: user.totpEnabled,
     hasPassword: !!user.passwordHash,
     oidcLinked: !!user.oidcSubject,
+    networkAdmin: user.networkAdmin,
   };
 }
 

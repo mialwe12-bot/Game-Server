@@ -4,11 +4,11 @@ import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { AdminUserDto, AuditLogDto, InviteDto, Paginated, ServerUpdateStatus, StorageOverview } from '@gameserver/shared';
 import { readableCode } from '../lib/crypto.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { hashPassword } from '../lib/password.js';
 import { sendFile } from '../lib/send.js';
 import { iso } from '../lib/time.js';
-import { requireAdmin } from '../plugins/auth.js';
+import { requireAuth, requireNetworkAdmin } from '../plugins/auth.js';
 import { announcementDto, announcementInclude, userPublic } from '../services/dto.js';
 import { saveImageUpload } from '../lib/image-upload.js';
 import { passwordSchema, usernameSchema } from './auth.js';
@@ -21,9 +21,10 @@ const pageQuery = {
 export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
   const ctx = app.ctx;
 
-  // Alle Admin-Routen erfordern die Rolle ADMIN.
+  // Alle Admin-Routen erfordern die Rolle ADMIN (Server-Admin) – oder Netzwerk-Admin (Admin auf allen Servern, inkl. Heimserver).
   app.addHook('preHandler', async (req) => {
-    requireAdmin(req);
+    const auth = requireAuth(req);
+    if (auth.user.role !== 'ADMIN' && !auth.user.networkAdmin) throw forbidden();
   });
 
   // ---- Übersicht ----
@@ -69,6 +70,7 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
       uploadQuotaBytes: u.uploadQuotaBytes !== null ? Number(u.uploadQuotaBytes) : null,
       usedUploadBytes: used,
       libraryCount: u._count.library,
+      networkAdmin: u.networkAdmin,
     };
   }
 
@@ -170,6 +172,26 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
         meta: { username: target.username, fields: Object.keys(req.body) },
         ip: req.ip,
       });
+      return adminUser(target.id);
+    },
+  );
+
+  // Netzwerk-Admin ernennen/entziehen – nur Netzwerk-Admins (der erste wird per Seed/CLI gesetzt).
+  app.patch(
+    '/users/:id/network-admin',
+    { schema: { tags: ['admin'], summary: 'Netzwerk-Admin-Status setzen (nur Netzwerk-Admins)', params: z.object({ id: z.string() }), body: z.object({ networkAdmin: z.boolean() }) } },
+    async (req) => {
+      requireNetworkAdmin(req);
+      const me = req.auth!.user;
+      const target = await ctx.db.user.findUnique({ where: { id: req.params.id } });
+      if (!target) throw notFound('Nutzer nicht gefunden');
+      // Letzten Netzwerk-Admin nicht entziehen
+      if (!req.body.networkAdmin && target.networkAdmin) {
+        const count = await ctx.db.user.count({ where: { networkAdmin: true } });
+        if (count <= 1) throw badRequest('Es muss mindestens ein Netzwerk-Admin bleiben', 'last_network_admin');
+      }
+      await ctx.db.user.update({ where: { id: target.id }, data: { networkAdmin: req.body.networkAdmin } });
+      await ctx.audit.log({ userId: me.id, action: 'admin.network_admin_set', target: target.id, meta: { username: target.username, networkAdmin: req.body.networkAdmin }, ip: req.ip });
       return adminUser(target.id);
     },
   );
