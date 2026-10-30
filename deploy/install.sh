@@ -7,7 +7,7 @@
 #
 # Was das Skript macht:
 #   1. prüft Docker + Compose (bietet die Installation über get.docker.com an)
-#   2. lädt den Quellcode nach /opt/gameserver (oder aktualisiert ihn)
+#   2. aktualisiert eine vorhandene Installation am Ort (Skript liegt darin) oder klont nach /opt/gameserver
 #   3. erzeugt .env mit zufälligen Passwörtern und deinen Angaben (Domain, Speicherort, E-Mail)
 #   4. richtet den Webzugang ein:
 #        a) eigener Caddy-Container mit automatischem HTTPS (Let's Encrypt) – Ports 80/443
@@ -25,7 +25,20 @@ set -euo pipefail
 
 REPO_URL="${GS_REPO_URL:-https://github.com/mialwe12-bot/Game-Server.git}"
 BRANCH="${GS_BRANCH:-claude/magical-archimedes-jb34jz}"
-INSTALL_DIR="${GS_INSTALL_DIR:-/opt/gameserver}"
+# Installationsverzeichnis:
+#  1. GS_INSTALL_DIR, falls gesetzt
+#  2. der Ordner, in dem dieses Skript liegt (deploy/..), wenn das bereits eine Installation ist (hat docker-compose.yml)
+#     -> Update am Ort, egal wohin geklont wurde
+#  3. sonst /opt/gameserver (standalone-Download -> frische Installation dorthin klonen)
+_self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+if ! _self_dir="$(cd "$(dirname "$_self")/.." 2>/dev/null && pwd)"; then _self_dir=""; fi
+if [[ -n "${GS_INSTALL_DIR:-}" ]]; then
+  INSTALL_DIR="$GS_INSTALL_DIR"
+elif [[ -n "$_self_dir" && -f "$_self_dir/docker-compose.yml" ]]; then
+  INSTALL_DIR="$_self_dir"
+else
+  INSTALL_DIR="/opt/gameserver"
+fi
 ASSUME_YES=false
 [[ "${1:-}" == "--yes" || "${1:-}" == "-y" ]] && ASSUME_YES=true
 
