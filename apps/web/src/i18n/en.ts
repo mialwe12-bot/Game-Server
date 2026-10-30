@@ -616,6 +616,8 @@ const en: Translation = {
       updateConfirm: 'Update the server now? It will be rebuilt and briefly unavailable.',
       updateStarted: 'Update started – the server will restart shortly. Please reload the page in a minute or two.',
       updateManualHint: 'One-click update is not configured. Run the update on the server manually:',
+      forceUpdateHint: 'One-click update is active. You can pull the latest branch state any time (even without a detected release).',
+      applyUpdateAnyway: 'Update now',
       updateCheckDisabled: 'Version checking is disabled (UPDATE_CHECK_URL empty).',
       updateCheckError: 'Check failed: {{error}}',
       branding: 'Branding',

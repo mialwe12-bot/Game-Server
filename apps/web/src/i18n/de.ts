@@ -615,6 +615,8 @@ const de = {
       updateConfirm: 'Server jetzt aktualisieren? Der Server wird dabei neu gebaut und kurz nicht erreichbar sein.',
       updateStarted: 'Update gestartet – der Server startet gleich neu. Bitte die Seite in ein bis zwei Minuten neu laden.',
       updateManualHint: 'Ein-Klick-Update ist nicht eingerichtet. Update manuell auf dem Server ausführen:',
+      forceUpdateHint: 'Ein-Klick-Update ist aktiv. Du kannst jederzeit auf den neuesten Stand des Branches ziehen (auch ohne erkanntes Release).',
+      applyUpdateAnyway: 'Jetzt aktualisieren',
       updateCheckDisabled: 'Die Versionsprüfung ist deaktiviert (UPDATE_CHECK_URL leer).',
       updateCheckError: 'Prüfung fehlgeschlagen: {{error}}',
       branding: 'Branding',

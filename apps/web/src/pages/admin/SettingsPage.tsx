@@ -316,6 +316,23 @@ function UpdateCard() {
             )}
           </div>
         )}
+        {/* Branch-/Privat-Repo-Deployments: wenn Ein-Klick-Update aktiv ist, lässt sich jederzeit auf den neuesten
+            Stand ziehen – auch wenn die Versionsprüfung (GitHub-Releases) nichts findet. */}
+        {status && status.canApply && !status.updateAvailable && (
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <p className="text-sm text-muted">{t('admin.settingsPage.forceUpdateHint')}</p>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={apply.isPending}
+              onClick={() => {
+                if (confirm(t('admin.settingsPage.updateConfirm'))) apply.mutate();
+              }}
+            >
+              {t('admin.settingsPage.applyUpdateAnyway')}
+            </Button>
+          </div>
+        )}
       </div>
     </Card>
   );
