@@ -308,6 +308,30 @@ describe('Föderation Fern-Administration', () => {
   it('Hub-Proxy verlangt einen ACTIVE-Server', async () => {
     await expect(t.app.ctx.federation.remoteOverview('gibt-es-nicht')).rejects.toThrow();
   });
+
+  it('listet Spiele und ändert die Sichtbarkeit per Fernverwaltung', async () => {
+    await selfAsPeer();
+    const list = await signedGet('/api/federation/admin/games');
+    expect(list.statusCode).toBe(200);
+    const game = list.json().find((g: { title: string }) => g.title === 'Netzwerkspiel');
+    expect(game).toBeTruthy();
+
+    const vis = await signedPost(`/api/federation/admin/games/${game.id}/visibility?visibility=HIDDEN`);
+    expect(vis.statusCode).toBe(200);
+    expect(vis.json().visibility).toBe('HIDDEN');
+    expect((await t.app.ctx.db.game.findUniqueOrThrow({ where: { id: game.id } })).visibility).toBe('HIDDEN');
+  });
+
+  it('liefert Audit-Log und Backups-Liste per Fernverwaltung', async () => {
+    await selfAsPeer();
+    const logs = await signedGet('/api/federation/admin/logs');
+    expect(logs.statusCode).toBe(200);
+    expect(Array.isArray(logs.json())).toBe(true);
+
+    const backups = await signedGet('/api/federation/admin/backups');
+    expect(backups.statusCode).toBe(200);
+    expect(Array.isArray(backups.json())).toBe(true);
+  });
 });
 
 describe('Netzwerk-Admin-Rollenmodell', () => {

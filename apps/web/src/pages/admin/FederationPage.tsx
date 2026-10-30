@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Check, Copy, Link2, RefreshCw, ServerCog, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FederatedServerDto, FederationPairingCode, FederationStatus, RegistrationMode, RemoteSettingsDto, RemoteUserDto, Role } from '@gameserver/shared';
+import type { FederatedServerDto, FederationPairingCode, FederationStatus, GameVisibility, RegistrationMode, RemoteSettingsDto, RemoteUserDto, Role } from '@gameserver/shared';
+import { VISIBILITIES } from '@gameserver/shared';
 import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageLoader, Select, Textarea, Toggle } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { formatBytes, formatDate } from '../../lib/format';
+import { formatBytes, formatDate, formatDateTime } from '../../lib/format';
 import { toast } from '../../lib/toast';
 
 function CopyButton({ value }: { value: string }) {
@@ -120,15 +121,129 @@ function RemoteSettingsEditor({ serverId }: { serverId: string }) {
   );
 }
 
-/** Fernverwaltungs-Panel: Übersicht + Einstellungen + Nutzerliste eines verbundenen Servers. */
+/** Fern-Spiele: Liste + Sichtbarkeit ändern. */
+function RemoteGames({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const games = useQuery({ queryKey: ['fed', 'remote', serverId, 'games'], queryFn: () => api.federation.remoteGames(serverId) });
+  const setVis = useMutation({
+    mutationFn: ({ gameId, visibility }: { gameId: string; visibility: GameVisibility }) => api.federation.remoteSetGameVisibility(serverId, gameId, visibility),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['fed', 'remote', serverId, 'games'] }),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  if (games.isLoading) return <PageLoader />;
+  if (games.isError) return <p className="text-sm text-danger">{errorMessage(games.error)}</p>;
+  if (!games.data || games.data.length === 0) return <p className="py-2 text-sm text-muted">{t('federation.remote.noGames')}</p>;
+  return (
+    <div>
+      {games.data.map((g) => (
+        <div key={g.id} className="flex flex-wrap items-center gap-2 border-t border-border py-2 text-sm">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium">{g.title}</div>
+            <div className="truncate text-xs text-muted">
+              {g.slug} · {t('federation.remote.versions', { n: g.versionCount })} · {t('federation.remote.downloads', { n: g.downloadCount })}
+            </div>
+          </div>
+          <Select value={g.visibility} onChange={(e) => setVis.mutate({ gameId: g.id, visibility: e.target.value as GameVisibility })} disabled={setVis.isPending} className="w-40">
+            {VISIBILITIES.map((v) => (
+              <option key={v} value={v}>
+                {t(`visibility.${v}`)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Fern-Logs: Audit-Log (nur lesen). */
+function RemoteLogs({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
+  const logs = useQuery({ queryKey: ['fed', 'remote', serverId, 'logs'], queryFn: () => api.federation.remoteLogs(serverId) });
+  if (logs.isLoading) return <PageLoader />;
+  if (logs.isError) return <p className="text-sm text-danger">{errorMessage(logs.error)}</p>;
+  if (!logs.data || logs.data.length === 0) return <p className="py-2 text-sm text-muted">{t('federation.remote.noLogs')}</p>;
+  return (
+    <div className="max-h-80 overflow-y-auto">
+      {logs.data.map((l) => (
+        <div key={l.id} className="border-t border-border py-1.5 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono font-medium">{l.action}</span>
+            {l.user && <span className="text-muted">{l.user.username}</span>}
+            <span className="ml-auto text-muted">{formatDateTime(l.createdAt)}</span>
+          </div>
+          {l.target && <div className="truncate text-muted">{l.target}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Fern-Backups: Liste + starten. */
+function RemoteBackups({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const backups = useQuery({ queryKey: ['fed', 'remote', serverId, 'backups'], queryFn: () => api.federation.remoteBackups(serverId) });
+  const create = useMutation({
+    mutationFn: (includeFiles: boolean) => api.federation.remoteCreateBackup(serverId, includeFiles),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['fed', 'remote', serverId, 'backups'] });
+      toast.success(t('federation.remote.backupStarted'));
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => create.mutate(false)} loading={create.isPending}>
+          {t('federation.remote.backupDb')}
+        </Button>
+        <Button onClick={() => create.mutate(true)} loading={create.isPending}>
+          {t('federation.remote.backupFull')}
+        </Button>
+        <Button variant="ghost" onClick={() => backups.refetch()} loading={backups.isFetching}>
+          <RefreshCw className="size-4" />
+        </Button>
+      </div>
+      {backups.isError ? (
+        <p className="text-sm text-danger">{errorMessage(backups.error)}</p>
+      ) : !backups.data || backups.data.length === 0 ? (
+        <p className="py-2 text-sm text-muted">{t('federation.remote.noBackups')}</p>
+      ) : (
+        backups.data.map((b) => (
+          <div key={b.id} className="flex flex-wrap items-center gap-2 border-t border-border py-2 text-sm">
+            <div className="min-w-0 flex-1 truncate">
+              <span className="font-mono text-xs">{b.filename}</span>
+            </div>
+            <Badge tone={b.status === 'COMPLETED' ? 'success' : b.status === 'FAILED' ? 'danger' : 'warning'}>{b.status}</Badge>
+            <span className="text-xs text-muted">{b.size ? formatBytes(b.size) : '—'}</span>
+            <span className="text-xs text-muted">{formatDateTime(b.createdAt)}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+/** Fernverwaltungs-Panel: Übersicht + Tabs (Nutzer/Spiele/Einstellungen/Logs/Backups) eines verbundenen Servers. */
 function RemoteAdminPanel({ server }: { server: FederatedServerDto }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<'users' | 'games' | 'settings' | 'logs' | 'backups'>('users');
   const overview = useQuery({ queryKey: ['fed', 'remote', server.id, 'overview'], queryFn: () => api.federation.remoteOverview(server.id) });
-  const users = useQuery({ queryKey: ['fed', 'remote', server.id, 'users', query], queryFn: () => api.federation.remoteUsers(server.id, query || undefined) });
+  const users = useQuery({ queryKey: ['fed', 'remote', server.id, 'users', query], queryFn: () => api.federation.remoteUsers(server.id, query || undefined), enabled: tab === 'users' });
   const refreshUsers = () => void qc.invalidateQueries({ queryKey: ['fed', 'remote', server.id, 'users'] });
+
+  const tabs: { id: typeof tab; label: string }[] = [
+    { id: 'users', label: t('federation.remote.usersTitle') },
+    { id: 'games', label: t('federation.remote.gamesTitle') },
+    { id: 'settings', label: t('federation.remote.settingsTitle') },
+    { id: 'logs', label: t('federation.remote.logsTitle') },
+    { id: 'backups', label: t('federation.remote.backupsTitle') },
+  ];
 
   const o = overview.data;
   const stats: [string, string][] = o
@@ -166,33 +281,46 @@ function RemoteAdminPanel({ server }: { server: FederatedServerDto }) {
         <PageLoader />
       )}
 
-      <div>
-        <p className="mb-2 text-sm font-medium">{t('federation.remote.settingsTitle')}</p>
-        <RemoteSettingsEditor serverId={server.id} />
+      <div className="scrollbar-thin flex gap-1 overflow-x-auto border-b border-border">
+        {tabs.map((tb) => (
+          <button
+            key={tb.id}
+            type="button"
+            onClick={() => setTab(tb.id)}
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-1.5 text-sm font-medium transition ${tab === tb.id ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-fg'}`}
+          >
+            {tb.label}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <p className="mb-2 text-sm font-medium">{t('federation.remote.usersTitle')}</p>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setQuery(q.trim());
-          }}
-        >
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('federation.remote.searchUsers')} />
-          <Button type="submit">{t('common.search')}</Button>
-        </form>
-        <div className="mt-2">
-          {users.isLoading ? (
-            <PageLoader />
-          ) : users.data && users.data.length > 0 ? (
-            users.data.map((u) => <RemoteUserRow key={u.id} serverId={server.id} u={u} onChange={refreshUsers} />)
-          ) : (
-            <p className="py-2 text-sm text-muted">{t('federation.remote.noUsers')}</p>
-          )}
+      {tab === 'users' && (
+        <div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setQuery(q.trim());
+            }}
+          >
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('federation.remote.searchUsers')} />
+            <Button type="submit">{t('common.search')}</Button>
+          </form>
+          <div className="mt-2">
+            {users.isLoading ? (
+              <PageLoader />
+            ) : users.data && users.data.length > 0 ? (
+              users.data.map((u) => <RemoteUserRow key={u.id} serverId={server.id} u={u} onChange={refreshUsers} />)
+            ) : (
+              <p className="py-2 text-sm text-muted">{t('federation.remote.noUsers')}</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+      {tab === 'games' && <RemoteGames serverId={server.id} />}
+      {tab === 'settings' && <RemoteSettingsEditor serverId={server.id} />}
+      {tab === 'logs' && <RemoteLogs serverId={server.id} />}
+      {tab === 'backups' && <RemoteBackups serverId={server.id} />}
     </div>
   );
 }

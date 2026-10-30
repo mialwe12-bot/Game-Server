@@ -332,6 +332,23 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - **Sicherheitshinweis**: Das ist eine bewusste, offene Betreiberentscheidung (keine versteckte Hintertür): Wer sich mit
   einem Server verbindet (Pairing), akzeptiert dessen Netzwerk-Admins als Admins des eigenen Servers; `BLOCKED` trennt sofort.
 
+### #26 Fern-Spiele / -Logs / -Backups (umgesetzt)
+- Für Netzwerk-Admins über die Hub-Fernverwaltung jedes ACTIVE-Servers:
+  - **Spiele**: `RemoteGameAdminDto` (id, slug, title, visibility, versionCount, downloadCount); Liste + Sichtbarkeit ändern
+    (`localGames`/`localSetGameVisibility`, setzt `publishedAt` beim ersten Verlassen von HIDDEN wie lokal).
+  - **Logs**: die letzten Audit-Einträge als `AuditLogDto[]` (`localAuditLog`, read-only).
+  - **Backups**: `BackupDto[]` listen + Backup starten (`localBackups`/`localCreateBackup` → `ctx.backups.list/start`).
+- **Routen** peer-signiert (R, nur `verifyPeer`): `GET /federation/admin/games`, `POST …/games/:id/visibility?visibility=`,
+  `GET …/logs`, `GET …/backups`, `POST …/backups?includeFiles=`. Hub (requireNetworkAdmin):
+  `GET /admin/federation/servers/:id/remote/{games,logs,backups}`, `PATCH …/remote/games/:gameId`, `POST …/remote/backups`.
+- **ApiClient**: `federation.remoteGames/remoteSetGameVisibility/remoteLogs/remoteBackups/remoteCreateBackup`.
+- **Web**: RemoteAdminPanel ist jetzt tab-basiert (Nutzer/Spiele/Einstellungen/Protokoll/Backups) mit Übersicht oben;
+  Komponenten `RemoteGames`/`RemoteLogs`/`RemoteBackups`. i18n `federation.remote.{gamesTitle,logsTitle,backupsTitle,
+  noGames,noLogs,noBackups,versions,downloads,backupStarted,backupDb,backupFull}` (DE+EN); Spiel-Sichtbarkeit nutzt die
+  Top-Level-`visibility.*`-Keys.
+- **Tests**: +2 in `federation.test.ts` (Spiele listen+Sichtbarkeit, Logs+Backups-Liste) → **30 Föderationstests grün**.
+- **Offen**: Fern-Build-/Versionsverwaltung, Backup-Download über Server-Grenzen, Log-Filter/Pagination (aktuell letzte 50).
+
 ### Föderation Stufe 3 (fertig: föderierter Chat / Netzwerk-DMs)
 - Direktnachrichten über Servergrenzen: Nutzer A (Heimat-Server A) schreibt Nutzer R (Heimat-Server B). Auf jeder Seite ist
   die DM eine DIRECT-Konversation zwischen dem lokalen Nutzer und einem **Schatten-Konto** des Remote-Partners.

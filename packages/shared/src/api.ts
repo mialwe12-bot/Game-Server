@@ -25,6 +25,7 @@ import type {
   MetadataField,
   MetadataProvider,
   MetadataSearchResult,
+  GameVisibility,
   Paginated,
   Platform,
   PublicSettings,
@@ -121,6 +122,7 @@ import type {
   NetworkGameDto,
   RemoteAdminOverview,
   RemoteDownloadDto,
+  RemoteGameAdminDto,
   RemoteSettingsDto,
   RemoteUserDto,
 } from './federation.js';
@@ -568,6 +570,12 @@ export class ApiClient {
     remoteSettings: (id: string) => this.get<RemoteSettingsDto>(`/admin/federation/servers/${id}/remote/settings`),
     remoteUpdateSettings: (id: string, patch: Partial<RemoteSettingsDto>) =>
       this.patch<RemoteSettingsDto>(`/admin/federation/servers/${id}/remote/settings`, patch),
+    remoteGames: (id: string, q?: string) => this.get<RemoteGameAdminDto[]>(`/admin/federation/servers/${id}/remote/games`, q ? { q } : undefined),
+    remoteSetGameVisibility: (id: string, gameId: string, visibility: GameVisibility) =>
+      this.patch<RemoteGameAdminDto>(`/admin/federation/servers/${id}/remote/games/${gameId}`, { visibility }),
+    remoteLogs: (id: string) => this.get<AuditLogDto[]>(`/admin/federation/servers/${id}/remote/logs`),
+    remoteBackups: (id: string) => this.get<BackupDto[]>(`/admin/federation/servers/${id}/remote/backups`),
+    remoteCreateBackup: (id: string, includeFiles: boolean) => this.post<BackupDto>(`/admin/federation/servers/${id}/remote/backups`, { includeFiles }),
     // Stufe 2: geteilte Accounts
     peers: () => this.get<FederationPeer[]>('/federation/peers'),
     authorizeApprove: (data: { origin: string; redirect: string; state: string }) => this.post<{ redirectUrl: string }>('/federation/authorize/approve', data),

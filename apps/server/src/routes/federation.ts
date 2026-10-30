@@ -5,8 +5,11 @@ import type {
   FederationInfo,
   FederationPairingCode,
   NetworkGameDto,
+  AuditLogDto,
+  BackupDto,
   RemoteAdminOverview,
   RemoteDownloadDto,
+  RemoteGameAdminDto,
   RemoteGameDto,
   RemoteSettingsDto,
   RemoteUserDto,
@@ -188,6 +191,52 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // Fern: Spiele / Logs / Backups (R-Seite, peer-signiert)
+  app.get(
+    '/federation/admin/games',
+    { schema: { tags: ['federation'], summary: 'Spiele für die Fernverwaltung', querystring: z.object({ q: z.string().trim().max(100).optional() }) }, config: { skipCsrf: true } },
+    async (req): Promise<RemoteGameAdminDto[]> => {
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+      return fed.localGames(req.query.q);
+    },
+  );
+
+  app.post(
+    '/federation/admin/games/:id/visibility',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Sichtbarkeit eines Spiels per Fernverwaltung ändern',
+        params: z.object({ id: z.string() }),
+        querystring: z.object({ visibility: z.enum(['PUBLIC', 'UNLISTED', 'RESTRICTED', 'HIDDEN']) }),
+      },
+      config: { skipCsrf: true },
+    },
+    async (req): Promise<RemoteGameAdminDto> => {
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+      return fed.localSetGameVisibility(req.params.id, req.query.visibility);
+    },
+  );
+
+  app.get('/federation/admin/logs', { schema: { tags: ['federation'], summary: 'Audit-Log für die Fernverwaltung' }, config: { skipCsrf: true } }, async (req): Promise<AuditLogDto[]> => {
+    await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+    return fed.localAuditLog();
+  });
+
+  app.get('/federation/admin/backups', { schema: { tags: ['federation'], summary: 'Backups für die Fernverwaltung' }, config: { skipCsrf: true } }, async (req): Promise<BackupDto[]> => {
+    await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+    return fed.localBackups();
+  });
+
+  app.post(
+    '/federation/admin/backups',
+    { schema: { tags: ['federation'], summary: 'Backup per Fernverwaltung starten', querystring: z.object({ includeFiles: z.enum(['true', 'false']).optional() }) }, config: { skipCsrf: true } },
+    async (req): Promise<BackupDto> => {
+      await fed.verifyPeer(req.headers as Record<string, unknown>, req.method, req.url);
+      return fed.localCreateBackup(req.query.includeFiles === 'true');
+    },
+  );
+
   // --- Per Pairing-Code: eingehende Anmeldung eines anderen Servers ---
   app.post(
     '/federation/pair',
@@ -328,6 +377,55 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
       const server = await fed.remoteUpdateSettings(req.params.id, req.body);
       await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_settings_update', target: req.params.id, meta: req.body, ip: req.ip });
       return server;
+    },
+  );
+
+  // Fern: Spiele / Logs / Backups (Hub-Seite, nur Netzwerk-Admins)
+  app.get(
+    '/admin/federation/servers/:id/remote/games',
+    { schema: { tags: ['federation'], summary: 'Spiele eines fernverwalteten Servers', params: z.object({ id: z.string() }), querystring: z.object({ q: z.string().trim().max(100).optional() }) } },
+    async (req): Promise<RemoteGameAdminDto[]> => {
+      requireNetworkAdmin(req);
+      return fed.remoteGames(req.params.id, req.query.q);
+    },
+  );
+
+  app.patch(
+    '/admin/federation/servers/:id/remote/games/:gameId',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Sichtbarkeit eines Remote-Spiels ändern',
+        params: z.object({ id: z.string(), gameId: z.string() }),
+        body: z.object({ visibility: z.enum(['PUBLIC', 'UNLISTED', 'RESTRICTED', 'HIDDEN']) }),
+      },
+    },
+    async (req): Promise<RemoteGameAdminDto> => {
+      requireNetworkAdmin(req);
+      const game = await fed.remoteSetGameVisibility(req.params.id, req.params.gameId, req.body.visibility);
+      await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_game_visibility', target: req.params.id, meta: { gameId: req.params.gameId, visibility: req.body.visibility }, ip: req.ip });
+      return game;
+    },
+  );
+
+  app.get('/admin/federation/servers/:id/remote/logs', { schema: { tags: ['federation'], summary: 'Audit-Log eines fernverwalteten Servers', params: z.object({ id: z.string() }) } }, async (req): Promise<AuditLogDto[]> => {
+    requireNetworkAdmin(req);
+    return fed.remoteAuditLog(req.params.id);
+  });
+
+  app.get('/admin/federation/servers/:id/remote/backups', { schema: { tags: ['federation'], summary: 'Backups eines fernverwalteten Servers', params: z.object({ id: z.string() }) } }, async (req): Promise<BackupDto[]> => {
+    requireNetworkAdmin(req);
+    return fed.remoteBackups(req.params.id);
+  });
+
+  app.post(
+    '/admin/federation/servers/:id/remote/backups',
+    { schema: { tags: ['federation'], summary: 'Backup auf einem fernverwalteten Server starten', params: z.object({ id: z.string() }), body: z.object({ includeFiles: z.boolean().default(false) }) } },
+    async (req): Promise<BackupDto> => {
+      requireNetworkAdmin(req);
+      const backup = await fed.remoteCreateBackup(req.params.id, req.body.includeFiles);
+      await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_backup_start', target: req.params.id, meta: { includeFiles: req.body.includeFiles }, ip: req.ip });
+      return backup;
     },
   );
 

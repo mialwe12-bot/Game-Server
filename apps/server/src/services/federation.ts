@@ -1,14 +1,18 @@
 import { createHash, createHmac, createPrivateKey, createPublicKey, randomBytes, sign as edSign, timingSafeEqual, verify as edVerify } from 'node:crypto';
 import type { FederatedServer, User } from '@prisma/client';
 import type {
+  AuditLogDto,
+  BackupDto,
   FederatedIdentity,
   FederatedServerDto,
   FederationInfo,
   FederationPeer,
+  GameVisibility,
   NetworkGameDto,
   RemoteAdminOverview,
   RemoteBuildDto,
   RemoteDownloadDto,
+  RemoteGameAdminDto,
   RemoteGameDto,
   RemoteSettingsDto,
   RemoteUserDto,
@@ -17,6 +21,7 @@ import type {
 import type { AppContext } from '../context.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { iso } from '../lib/time.js';
+import { userPublic } from './dto.js';
 import { messageDto } from './social-dto.js';
 
 const CLOCK_SKEW_MS = 5 * 60_000;
@@ -708,6 +713,81 @@ export class FederationService {
     if (patch.maintenanceMode !== undefined) params.set('maintenanceMode', String(patch.maintenanceMode));
     if (patch.maintenanceMessage !== undefined) params.set('maintenanceMessage', patch.maintenanceMessage);
     return this.remoteJson<RemoteSettingsDto>(serverId, 'POST', `/api/federation/admin/settings?${params.toString()}`);
+  }
+
+  // --- Fern: Spiele ---
+  /** R-Seite: Spiele dieses Servers (kompakt). */
+  async localGames(q?: string): Promise<RemoteGameAdminDto[]> {
+    const games = await this.ctx.db.game.findMany({
+      where: q ? { OR: [{ title: { contains: q, mode: 'insensitive' } }, { slug: { contains: q, mode: 'insensitive' } }] } : undefined,
+      orderBy: { title: 'asc' },
+      take: 300,
+      include: { _count: { select: { versions: true } } },
+    });
+    return games.map((g) => ({ id: g.id, slug: g.slug, title: g.title, visibility: g.visibility, versionCount: g._count.versions, downloadCount: g.downloadCount }));
+  }
+
+  /** R-Seite: Sichtbarkeit eines Spiels ändern. */
+  async localSetGameVisibility(id: string, visibility: GameVisibility): Promise<RemoteGameAdminDto> {
+    const existing = await this.ctx.db.game.findUnique({ where: { id } });
+    if (!existing) throw notFound('Spiel nicht gefunden');
+    // publishedAt beim ersten Verlassen von HIDDEN setzen (wie im lokalen Admin).
+    const data: { visibility: GameVisibility; publishedAt?: Date } = { visibility };
+    if (existing.visibility === 'HIDDEN' && visibility !== 'HIDDEN' && !existing.publishedAt) data.publishedAt = new Date();
+    const g = await this.ctx.db.game.update({ where: { id }, data, include: { _count: { select: { versions: true } } } });
+    return { id: g.id, slug: g.slug, title: g.title, visibility: g.visibility, versionCount: g._count.versions, downloadCount: g.downloadCount };
+  }
+
+  /** Hub-Seite: Spiele eines fernverwalteten Servers. */
+  remoteGames(serverId: string, q?: string): Promise<RemoteGameAdminDto[]> {
+    const query = q ? `?q=${encodeURIComponent(q)}` : '';
+    return this.remoteJson<RemoteGameAdminDto[]>(serverId, 'GET', `/api/federation/admin/games${query}`);
+  }
+
+  /** Hub-Seite: Sichtbarkeit eines Remote-Spiels ändern (Parameter in der signierten URL). */
+  remoteSetGameVisibility(serverId: string, gameId: string, visibility: GameVisibility): Promise<RemoteGameAdminDto> {
+    return this.remoteJson<RemoteGameAdminDto>(serverId, 'POST', `/api/federation/admin/games/${encodeURIComponent(gameId)}/visibility?visibility=${visibility}`);
+  }
+
+  // --- Fern: Audit-Logs ---
+  /** R-Seite: die letzten Audit-Log-Einträge. */
+  async localAuditLog(limit = 50): Promise<AuditLogDto[]> {
+    const rows = await this.ctx.db.auditLog.findMany({ include: { user: true }, orderBy: { createdAt: 'desc' }, take: Math.min(limit, 200) });
+    return rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      target: r.target,
+      meta: (r.meta ?? {}) as Record<string, unknown>,
+      ip: r.ip,
+      createdAt: r.createdAt.toISOString(),
+      user: r.user ? userPublic(r.user) : null,
+    }));
+  }
+
+  /** Hub-Seite: Audit-Log eines fernverwalteten Servers. */
+  remoteAuditLog(serverId: string): Promise<AuditLogDto[]> {
+    return this.remoteJson<AuditLogDto[]>(serverId, 'GET', '/api/federation/admin/logs');
+  }
+
+  // --- Fern: Backups ---
+  /** R-Seite: Backups dieses Servers. */
+  localBackups(): Promise<BackupDto[]> {
+    return this.ctx.backups.list();
+  }
+
+  /** R-Seite: ein Backup starten. */
+  localCreateBackup(includeFiles: boolean): Promise<BackupDto> {
+    return this.ctx.backups.start(includeFiles, null);
+  }
+
+  /** Hub-Seite: Backups eines fernverwalteten Servers. */
+  remoteBackups(serverId: string): Promise<BackupDto[]> {
+    return this.remoteJson<BackupDto[]>(serverId, 'GET', '/api/federation/admin/backups');
+  }
+
+  /** Hub-Seite: Backup auf einem fernverwalteten Server starten. */
+  remoteCreateBackup(serverId: string, includeFiles: boolean): Promise<BackupDto> {
+    return this.remoteJson<BackupDto>(serverId, 'POST', `/api/federation/admin/backups?includeFiles=${includeFiles}`);
   }
 
   // ---------------------------------------------------------------------------
