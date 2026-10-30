@@ -121,6 +121,7 @@ import type {
   NetworkGameDto,
   RemoteAdminOverview,
   RemoteDownloadDto,
+  RemoteSettingsDto,
   RemoteUserDto,
 } from './federation.js';
 
@@ -564,6 +565,9 @@ export class ApiClient {
     remoteUsers: (id: string, q?: string) => this.get<RemoteUserDto[]>(`/admin/federation/servers/${id}/remote/users`, q ? { q } : undefined),
     remoteUpdateUser: (id: string, userId: string, data: { role?: Role; disabled?: boolean }) =>
       this.patch<RemoteUserDto>(`/admin/federation/servers/${id}/remote/users/${userId}`, data),
+    remoteSettings: (id: string) => this.get<RemoteSettingsDto>(`/admin/federation/servers/${id}/remote/settings`),
+    remoteUpdateSettings: (id: string, patch: Partial<RemoteSettingsDto>) =>
+      this.patch<RemoteSettingsDto>(`/admin/federation/servers/${id}/remote/settings`, patch),
     // Stufe 2: geteilte Accounts
     peers: () => this.get<FederationPeer[]>('/federation/peers'),
     authorizeApprove: (data: { origin: string; redirect: string; state: string }) => this.post<{ redirectUrl: string }>('/federation/authorize/approve', data),

@@ -10,6 +10,7 @@ import type {
   RemoteBuildDto,
   RemoteDownloadDto,
   RemoteGameDto,
+  RemoteSettingsDto,
   RemoteUserDto,
   Role,
 } from '@gameserver/shared';
@@ -688,6 +689,49 @@ export class FederationService {
     if (data.role) params.set('role', data.role);
     if (data.disabled !== undefined) params.set('disabled', String(data.disabled));
     return this.remoteJson<RemoteUserDto>(serverId, 'POST', `/api/federation/admin/users/${encodeURIComponent(userId)}?${params.toString()}`);
+  }
+
+  /** R-Seite: bearbeitbare Betriebseinstellungen dieses Servers. */
+  async localSettings(): Promise<RemoteSettingsDto> {
+    const s = await this.ctx.settings.get();
+    return {
+      siteName: s.siteName,
+      siteDescription: s.siteDescription,
+      registrationMode: s.registrationMode,
+      storePublic: s.storePublic,
+      maintenanceMode: s.maintenanceMode,
+      maintenanceMessage: s.maintenanceMessage,
+    };
+  }
+
+  /** R-Seite: Betriebseinstellungen ändern (nur die übergebenen Felder). */
+  async localUpdateSettings(patch: Partial<RemoteSettingsDto>): Promise<RemoteSettingsDto> {
+    const allowed: Partial<RemoteSettingsDto> = {};
+    if (patch.siteName !== undefined) allowed.siteName = patch.siteName;
+    if (patch.siteDescription !== undefined) allowed.siteDescription = patch.siteDescription;
+    if (patch.registrationMode !== undefined) allowed.registrationMode = patch.registrationMode;
+    if (patch.storePublic !== undefined) allowed.storePublic = patch.storePublic;
+    if (patch.maintenanceMode !== undefined) allowed.maintenanceMode = patch.maintenanceMode;
+    if (patch.maintenanceMessage !== undefined) allowed.maintenanceMessage = patch.maintenanceMessage;
+    await this.ctx.settings.update(allowed);
+    return this.localSettings();
+  }
+
+  /** Hub-Seite: Betriebseinstellungen eines fernverwalteten Servers. */
+  remoteSettings(serverId: string): Promise<RemoteSettingsDto> {
+    return this.remoteJson<RemoteSettingsDto>(serverId, 'GET', '/api/federation/admin/settings');
+  }
+
+  /** Hub-Seite: Betriebseinstellungen eines fernverwalteten Servers ändern (Parameter in der signierten URL). */
+  remoteUpdateSettings(serverId: string, patch: Partial<RemoteSettingsDto>): Promise<RemoteSettingsDto> {
+    const params = new URLSearchParams();
+    if (patch.siteName !== undefined) params.set('siteName', patch.siteName);
+    if (patch.siteDescription !== undefined) params.set('siteDescription', patch.siteDescription);
+    if (patch.registrationMode !== undefined) params.set('registrationMode', patch.registrationMode);
+    if (patch.storePublic !== undefined) params.set('storePublic', String(patch.storePublic));
+    if (patch.maintenanceMode !== undefined) params.set('maintenanceMode', String(patch.maintenanceMode));
+    if (patch.maintenanceMessage !== undefined) params.set('maintenanceMessage', patch.maintenanceMessage);
+    return this.remoteJson<RemoteSettingsDto>(serverId, 'POST', `/api/federation/admin/settings?${params.toString()}`);
   }
 
   // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 // Typen für die Server-Föderation (Stufe 1): Netzwerk aus mehreren Servern,
 // geteilter Katalog und serverübergreifende Downloads.
-import type { BuildKind, Platform, Role } from './types.js';
+import type { BuildKind, Platform, RegistrationMode, Role } from './types.js';
 
 /** Öffentliche Kennung eines Servers – wird beim Pairing ausgetauscht. */
 export interface FederationInfo {
@@ -65,6 +65,16 @@ export interface RemoteAdminOverview {
   storageBytes: number;
   federatedServerCount: number;
   maintenanceMode: boolean;
+}
+
+/** Bearbeitbare Betriebseinstellungen eines fernverwalteten Servers. */
+export interface RemoteSettingsDto {
+  siteName: string;
+  siteDescription: string;
+  registrationMode: RegistrationMode;
+  storePublic: boolean;
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
 }
 
 /** Ein Nutzer eines fernverwalteten Servers (kompakt). */

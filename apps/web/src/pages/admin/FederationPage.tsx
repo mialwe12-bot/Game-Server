@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Check, Copy, Link2, RefreshCw, ServerCog, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FederatedServerDto, FederationPairingCode, FederationStatus, RemoteUserDto, Role } from '@gameserver/shared';
-import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageLoader, Select, Toggle } from '../../components/ui';
+import type { FederatedServerDto, FederationPairingCode, FederationStatus, RegistrationMode, RemoteSettingsDto, RemoteUserDto, Role } from '@gameserver/shared';
+import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageLoader, Select, Textarea, Toggle } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { formatBytes, formatDate } from '../../lib/format';
 import { toast } from '../../lib/toast';
@@ -58,7 +58,64 @@ function RemoteUserRow({ serverId, u, onChange }: { serverId: string; u: RemoteU
   );
 }
 
-/** Fernverwaltungs-Panel: Übersicht + Nutzerliste eines verbundenen Servers. */
+/** Fern-Einstellungen: wichtigste Betriebseinstellungen eines verbundenen Servers bearbeiten. */
+function RemoteSettingsEditor({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ['fed', 'remote', serverId, 'settings'], queryFn: () => api.federation.remoteSettings(serverId) });
+  const [draft, setDraft] = useState<RemoteSettingsDto | null>(null);
+  useEffect(() => {
+    if (settings.data) setDraft(settings.data);
+  }, [settings.data]);
+
+  const save = useMutation({
+    mutationFn: (patch: RemoteSettingsDto) => api.federation.remoteUpdateSettings(serverId, patch),
+    onSuccess: (data) => {
+      setDraft(data);
+      void qc.invalidateQueries({ queryKey: ['fed', 'remote', serverId, 'settings'] });
+      toast.success(t('federation.remote.settingsSaved'));
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+
+  if (settings.isError) return <p className="text-sm text-danger">{errorMessage(settings.error)}</p>;
+  if (!draft) return <PageLoader />;
+  const set = (patch: Partial<RemoteSettingsDto>) => setDraft({ ...draft, ...patch });
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label={t('federation.remote.siteName')}>
+          <Input value={draft.siteName} onChange={(e) => set({ siteName: e.target.value })} />
+        </Field>
+        <Field label={t('federation.remote.registration')}>
+          <Select value={draft.registrationMode} onChange={(e) => set({ registrationMode: e.target.value as RegistrationMode })}>
+            <option value="open">{t('federation.remote.regOpen')}</option>
+            <option value="invite">{t('federation.remote.regInvite')}</option>
+            <option value="closed">{t('federation.remote.regClosed')}</option>
+          </Select>
+        </Field>
+      </div>
+      <Field label={t('federation.remote.siteDescription')}>
+        <Input value={draft.siteDescription} onChange={(e) => set({ siteDescription: e.target.value })} />
+      </Field>
+      <div className="flex flex-wrap gap-4">
+        <Toggle checked={draft.storePublic} onChange={(v) => set({ storePublic: v })} label={t('federation.remote.storePublic')} />
+        <Toggle checked={draft.maintenanceMode} onChange={(v) => set({ maintenanceMode: v })} label={t('federation.remote.maintenance')} />
+      </div>
+      {draft.maintenanceMode && (
+        <Field label={t('federation.remote.maintenanceMessage')}>
+          <Textarea value={draft.maintenanceMessage} onChange={(e) => set({ maintenanceMessage: e.target.value })} rows={2} />
+        </Field>
+      )}
+      <Button variant="primary" onClick={() => save.mutate(draft)} loading={save.isPending}>
+        {t('common.save')}
+      </Button>
+    </div>
+  );
+}
+
+/** Fernverwaltungs-Panel: Übersicht + Einstellungen + Nutzerliste eines verbundenen Servers. */
 function RemoteAdminPanel({ server }: { server: FederatedServerDto }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -105,6 +162,12 @@ function RemoteAdminPanel({ server }: { server: FederatedServerDto }) {
       )}
 
       <div>
+        <p className="mb-2 text-sm font-medium">{t('federation.remote.settingsTitle')}</p>
+        <RemoteSettingsEditor serverId={server.id} />
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-medium">{t('federation.remote.usersTitle')}</p>
         <form
           className="flex gap-2"
           onSubmit={(e) => {

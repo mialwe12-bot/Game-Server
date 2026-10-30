@@ -294,9 +294,17 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
 - **Garantie bleibt**: Föderierte/Schatten-Konten sind lokal immer `USER`. Der fernverwaltende Hub-Admin kann die **lokalen**
   Nutzer des Zielservers verwalten (Rolle inkl. ADMIN, Deaktivierung) — das ist die ausdrücklich erteilte Fern-Admin-Rolle,
   kein automatischer Cross-Server-Zugriff.
-- **Offen #22**: Fern-**Einstellungen** bearbeiten (bisher nur Übersicht + Nutzer), Fern-Spiele/-Logs, Live-Status der
-  Erlaubnis in der UI ohne Sync-Wartezeit, serverübergreifende Avatare. Body-Signatur für Mutationen (aktuell Parameter in
-  der signierten URL; Body unsigniert wie im übrigen Föderations-Stack).
+- **Fern-Einstellungen (ergänzt):** Betriebseinstellungen eines verbundenen Servers lesen+ändern: `RemoteSettingsDto`
+  (siteName, siteDescription, registrationMode, storePublic, maintenanceMode, maintenanceMessage). Dienst
+  `localSettings`/`localUpdateSettings` (R) + `remoteSettings`/`remoteUpdateSettings` (Hub, Parameter in signierter URL).
+  Routen peer-signiert `GET/POST /federation/admin/settings`, Hub `GET/PATCH /admin/federation/servers/:id/remote/settings`.
+  ApiClient `federation.remoteSettings/remoteUpdateSettings`. Web: `RemoteSettingsEditor` im RemoteAdminPanel (Abschnitte
+  „Einstellungen"/„Nutzer"); i18n `federation.remote.{settingsTitle,usersTitle,siteName,siteDescription,registration,
+  reg*,storePublic,maintenanceMessage,settingsSaved}`. Tests +2 (lesen/ändern, Sperre ohne Freigabe) → **27 Föderations-,
+  141 Server-Tests grün**.
+- **Offen #22**: Fern-**Spiele/-Logs/-Backups**, Live-Status der Erlaubnis in der UI ohne Sync-Wartezeit, serverübergreifende
+  Avatare. Body-Signatur für Mutationen (aktuell Parameter in der signierten URL; Body unsigniert wie im übrigen
+  Föderations-Stack). Die Kern-Fern-Administration (Übersicht + Nutzer + Einstellungen) ist umgesetzt.
 
 ### Föderation Stufe 3 (fertig: föderierter Chat / Netzwerk-DMs)
 - Direktnachrichten über Servergrenzen: Nutzer A (Heimat-Server A) schreibt Nutzer R (Heimat-Server B). Auf jeder Seite ist

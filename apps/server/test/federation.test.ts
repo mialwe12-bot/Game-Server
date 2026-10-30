@@ -300,6 +300,29 @@ describe('Föderation Fern-Administration', () => {
     await expect(t.app.ctx.federation.remoteOverview(peer.id)).rejects.toThrow();
   });
 
+  it('liest und ändert Betriebseinstellungen per Fernverwaltung', async () => {
+    const peer = await selfAsPeer();
+    await t.app.ctx.db.federatedServer.update({ where: { id: peer.id }, data: { adminGranted: true } });
+
+    const get = await signedGet('/api/federation/admin/settings');
+    expect(get.statusCode).toBe(200);
+    expect(typeof get.json().siteName).toBe('string');
+
+    const post = await signedPost('/api/federation/admin/settings?maintenanceMode=true&siteName=Umbenannt');
+    expect(post.statusCode).toBe(200);
+    expect(post.json().maintenanceMode).toBe(true);
+    expect(post.json().siteName).toBe('Umbenannt');
+
+    const s = await t.app.ctx.settings.get();
+    expect(s.maintenanceMode).toBe(true);
+    expect(s.siteName).toBe('Umbenannt');
+  });
+
+  it('sperrt die Einstellungen-Route ohne Freigabe', async () => {
+    await selfAsPeer();
+    expect((await signedGet('/api/federation/admin/settings')).statusCode).toBe(403);
+  });
+
   it('spiegelt die Freigabe-Flags in der Server-DTO', async () => {
     const peer = await selfAsPeer();
     await t.app.ctx.federation.setAdminGranted(peer.id, true);

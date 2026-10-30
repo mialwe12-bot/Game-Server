@@ -8,6 +8,7 @@ import type {
   RemoteAdminOverview,
   RemoteDownloadDto,
   RemoteGameDto,
+  RemoteSettingsDto,
   RemoteUserDto,
 } from '@gameserver/shared';
 import { requireAdmin, requireAuth } from '../plugins/auth.js';
@@ -150,6 +151,42 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  app.get('/federation/admin/settings', { schema: { tags: ['federation'], summary: 'Betriebseinstellungen für die Fernverwaltung' }, config: { skipCsrf: true } }, async (req): Promise<RemoteSettingsDto> => {
+    await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+    return fed.localSettings();
+  });
+
+  app.post(
+    '/federation/admin/settings',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Betriebseinstellungen per Fernverwaltung ändern',
+        querystring: z.object({
+          siteName: z.string().trim().min(1).max(100).optional(),
+          siteDescription: z.string().max(500).optional(),
+          registrationMode: z.enum(['open', 'invite', 'closed']).optional(),
+          storePublic: z.enum(['true', 'false']).optional(),
+          maintenanceMode: z.enum(['true', 'false']).optional(),
+          maintenanceMessage: z.string().max(1000).optional(),
+        }),
+      },
+      config: { skipCsrf: true },
+    },
+    async (req): Promise<RemoteSettingsDto> => {
+      await fed.verifyPeerAdmin(req.headers as Record<string, unknown>, req.method, req.url);
+      const q = req.query;
+      return fed.localUpdateSettings({
+        siteName: q.siteName,
+        siteDescription: q.siteDescription,
+        registrationMode: q.registrationMode,
+        storePublic: q.storePublic === undefined ? undefined : q.storePublic === 'true',
+        maintenanceMode: q.maintenanceMode === undefined ? undefined : q.maintenanceMode === 'true',
+        maintenanceMessage: q.maintenanceMessage,
+      });
+    },
+  );
+
   // --- Per Pairing-Code: eingehende Anmeldung eines anderen Servers ---
   app.post(
     '/federation/pair',
@@ -270,6 +307,36 @@ export const federationRoutes: FastifyPluginAsyncZod = async (app) => {
       requireAdmin(req);
       const server = await fed.remoteUpdateUser(req.params.id, req.params.userId, req.body);
       await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_user_update', target: req.params.id, meta: { userId: req.params.userId, ...req.body }, ip: req.ip });
+      return server;
+    },
+  );
+
+  app.get('/admin/federation/servers/:id/remote/settings', { schema: { tags: ['federation'], summary: 'Betriebseinstellungen eines fernverwalteten Servers', params: z.object({ id: z.string() }) } }, async (req): Promise<RemoteSettingsDto> => {
+    requireAdmin(req);
+    return fed.remoteSettings(req.params.id);
+  });
+
+  app.patch(
+    '/admin/federation/servers/:id/remote/settings',
+    {
+      schema: {
+        tags: ['federation'],
+        summary: 'Betriebseinstellungen eines fernverwalteten Servers ändern',
+        params: z.object({ id: z.string() }),
+        body: z.object({
+          siteName: z.string().trim().min(1).max(100).optional(),
+          siteDescription: z.string().max(500).optional(),
+          registrationMode: z.enum(['open', 'invite', 'closed']).optional(),
+          storePublic: z.boolean().optional(),
+          maintenanceMode: z.boolean().optional(),
+          maintenanceMessage: z.string().max(1000).optional(),
+        }),
+      },
+    },
+    async (req): Promise<RemoteSettingsDto> => {
+      requireAdmin(req);
+      const server = await fed.remoteUpdateSettings(req.params.id, req.body);
+      await ctx.audit.log({ userId: req.auth!.user.id, action: 'federation.remote_settings_update', target: req.params.id, meta: req.body, ip: req.ip });
       return server;
     },
   );
