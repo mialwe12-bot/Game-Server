@@ -68,9 +68,19 @@ export interface RemoteFileDto {
   url: string;
 }
 
-/** Antwort auf die Download-Anfrage eines Remote-Builds. */
+/** Antwort auf die Download-Anfrage eines Remote-Builds (inkl. Metadaten zum Installieren/Starten). */
 export interface RemoteDownloadDto {
+  buildId: string;
+  platform: Platform;
+  version: string;
   kind: BuildKind;
+  executable: string;
+  launchArgs: string;
+  workingDir: string;
+  installerArgs: string;
+  linuxRunner: string;
+  installSize: number;
+  totalSize: number;
   files: RemoteFileDto[];
 }
 

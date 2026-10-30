@@ -219,7 +219,17 @@ export class FederationService {
     }
     const base = this.baseUrl();
     return {
+      buildId: build.id,
+      platform: build.platform,
+      version: build.version.version,
       kind: build.kind,
+      executable: build.executable,
+      launchArgs: build.launchArgs,
+      workingDir: build.workingDir,
+      installerArgs: build.installerArgs,
+      linuxRunner: build.linuxRunner,
+      installSize: Number(build.installSize),
+      totalSize: Number(build.totalSize),
       files: build.files.map((f) => {
         const path = `/api/builds/${build.id}/files/${f.id}`;
         return { path: f.path, size: Number(f.size), sha256: f.sha256, url: `${base}${this.ctx.signer.sign(path, FILE_URL_TTL)}` };
