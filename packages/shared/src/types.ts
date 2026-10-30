@@ -117,6 +117,30 @@ export interface BackupSchedule {
   keep: number;
 }
 
+/** Ein LiveKit-Voice-Server in der Failover-Liste. */
+export interface VoiceServerConfig {
+  /** Anzeigename (optional, z. B. „Main-Server“, „Backup Hetzner“). */
+  name?: string;
+  /** Öffentliche wss-URL des LiveKit-Servers. */
+  url: string;
+  /** API-Key dieses Servers (leer = LIVEKIT_API_KEY aus der Umgebung). */
+  apiKey?: string;
+  /** API-Secret dieses Servers (leer = LIVEKIT_API_SECRET aus der Umgebung). Im Admin-GET maskiert. */
+  apiSecret?: string;
+}
+
+/** Erreichbarkeits-Status eines Voice-Servers für die Admin-Anzeige. */
+export interface VoiceServerStatus {
+  name: string;
+  url: string;
+  /** Vom Server aus per HTTP-Probe erreichbar. */
+  healthy: boolean;
+  /** Reihenfolge (0 = Primär). */
+  order: number;
+  /** Ob dieser Server aktuell gewählt würde (erster erreichbarer). */
+  active: boolean;
+}
+
 export interface AdminSettings {
   siteName: string;
   siteDescription: string;
@@ -134,8 +158,18 @@ export interface AdminSettings {
   voiceEnabled: boolean;
   /** Voice-Backend: eingebautes Mesh oder eigener LiveKit-SFU */
   voiceBackend: 'MESH' | 'LIVEKIT';
-  /** Öffentliche wss-URL des LiveKit-Servers (nur bei Backend LIVEKIT) */
+  /**
+   * Öffentliche wss-URL des LiveKit-Servers (nur bei Backend LIVEKIT).
+   * Veraltet zugunsten von `voiceServers`; bleibt als Rückfall erhalten, wenn `voiceServers` leer ist
+   * (dann gilt diese eine URL als Primär-Server mit den API-Zugangsdaten aus der Umgebung).
+   */
   livekitUrl: string;
+  /**
+   * Geordnete Liste der LiveKit-Voice-Server für Ausfallsicherung. Eintrag 0 = Primär (läuft idealerweise
+   * auf dem Main-Server), danach die Fallbacks in der Reihenfolge, in der sie einspringen sollen.
+   * Leere `apiKey`/`apiSecret` bedeuten: API-Zugangsdaten aus der Umgebung (LIVEKIT_API_KEY/SECRET) verwenden.
+   */
+  voiceServers: VoiceServerConfig[];
   /** GIF-Suche im Chat (nur wirksam mit TENOR_API_KEY) */
   gifsEnabled: boolean;
   maxChatImageBytes: number;

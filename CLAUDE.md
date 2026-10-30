@@ -325,6 +325,32 @@ Kein Docker-Daemon in der Sandbox → Images nicht baubar; Deploy-Artefakt per `
   Code + Token sind getestet, die Medien-Verbindung verifiziert der Nutzer gegen seine Instanz. Fluxer-Identitäts-SSO
   (optional) nicht gebaut.
 
+### #21 Voice-Server auf Main-Server + konfigurierbares Failover (umgesetzt)
+- Nutzer-Wunsch: LiveKit-Voice läuft primär auf dem Main-Server; im Admin-Panel konfigurierbar, **ob und welche** Server
+  **in welcher Reihenfolge** einspringen, wenn der primäre ausfällt.
+- **Schema/Settings**: neues Feld `AdminSettings.voiceServers: VoiceServerConfig[]` (`{name?, url, apiKey?, apiSecret?}`),
+  geordnet (Index 0 = Primär/Main-Server, danach Fallbacks). Leere `apiKey`/`apiSecret` je Eintrag = `LIVEKIT_API_KEY/SECRET`
+  aus der Umgebung. Altes Einzelfeld `livekitUrl` bleibt als Rückfall (leere Liste → eine URL mit Env-Zugangsdaten).
+  `VoiceServerConfig`/`VoiceServerStatus` in `packages/shared/src/types.ts`; `VoiceToken` um `name?` erweitert.
+- **Dienst** `apps/server/src/services/voice.ts`: `resolveVoiceServers(settings, env)` (Liste auflösen, Env-Zugangsdaten
+  ergänzen, ungültige URLs/ohne Creds verwerfen), `probeLivekit(url)` (HTTP-GET auf wss→https, jede Antwort = erreichbar,
+  2,5 s Timeout), `class VoiceFailover` (Erreichbarkeits-Cache 30 s TTL; `pick()` = erster erreichbarer, bei einem Server
+  **ohne** Probe, keiner erreichbar → Primär als best effort; `status()` für die Anzeige). `probe` ist für Tests injizierbar.
+- **ChatService**: eigene `voiceFailover`-Instanz. `voiceToken` wählt per Failover den Server und signiert mit **dessen**
+  Key/Secret (gibt `url`+`name` des gewählten Servers zurück). `config()` meldet die Primär-URL als „ist konfiguriert"-Signal.
+  Neue Methode `voiceStatus()` (für Admin). Route `GET /api/admin/voice/status` (nur Admin). ApiClient `admin.voiceStatus`.
+- **Admin-Settings-Route**: Secrets werden im GET maskiert (`********`), beim PATCH per URL-Zuordnung erhalten, wenn leer/
+  maskiert gesendet; Audit-Log redigiert die Secrets. Zod-Schema `voiceServers` (max 10).
+- **Web**: Komponente `VoiceServersEditor` in `pages/admin/SettingsPage.tsx` (Liste: Name/URL/Key/Secret je Eintrag,
+  hoch/runter/entfernen/hinzufügen, Live-Status-Punkte „erreichbar/aktiv" via `admin.voiceStatus`). i18n `admin.settingsPage.voice*`
+  (DE+EN). Secret-Felder maskiert (Typ password), Platzhalter „aus Server-Umgebung".
+- **Client**: keine Änderung nötig – der Client nutzt die vom Token gelieferte `url`; den Failover entscheidet der Server.
+- **Tests** `test/voice.test.ts` (+11, gesamt 16): `resolveVoiceServers` (Rückfall/Reihenfolge/Verwerfen), `VoiceFailover`
+  (ein Server ohne Probe, erster erreichbarer, Fallback, keiner erreichbar, leer, Cache), Routen-Failover (zweiter Server
+  gewählt), Secret-Maskierung + Erhalt. Gesamt **134 Server-Tests grün**, Web i18n grün.
+- **Offen #21**: Health-Probe prüft aus Sicht des Servers (nicht des Clients); aktuell neue Beitritte wechseln den Server,
+  eine laufende Sitzung wird nicht umgezogen. Kein automatischer Medien-Live-Test in der Sandbox.
+
 ## Konventionen
 
 - Code-Kommentare und UI-Texte auf Deutsch (UI zusätzlich Englisch), Fehlermeldungen der API auf Deutsch mit maschinenlesbarem `error`-Code.

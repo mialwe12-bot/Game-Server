@@ -4,6 +4,7 @@ import type { ChatConfig, ConversationDto, IceServer, VoiceToken } from '@gamese
 import type { AppContext } from '../context.js';
 import { forbidden, notFound } from '../lib/errors.js';
 import { createLivekitToken } from '../lib/livekit.js';
+import { resolveVoiceServers, VoiceFailover } from './voice.js';
 import { fileUrl } from '../lib/image-upload.js';
 import { userPublic } from './dto.js';
 import { messageDto } from './social-dto.js';
@@ -23,6 +24,9 @@ export const conversationInclude = {
 };
 
 export class ChatService {
+  /** Failover-Auswahl über die geordnete Voice-Server-Liste (eigene Instanz hält den Erreichbarkeits-Cache). */
+  private readonly voiceFailover = new VoiceFailover();
+
   constructor(private readonly ctx: AppContext) {}
 
   /** ICE-Server für WebRTC: STUN aus der Konfiguration, TURN mit zeitlich begrenzten Zugangsdaten (coturn „use-auth-secret“). */
@@ -47,35 +51,51 @@ export class ChatService {
 
   async config(userId: string): Promise<ChatConfig> {
     const s = await this.ctx.settings.get();
+    // Repräsentative URL = Primär-Server (nur als „ist konfiguriert“-Signal fürs Frontend; die echte URL liefert das Token).
+    const primary = resolveVoiceServers(s, this.ctx.config)[0];
     return {
       gifsEnabled: s.gifsEnabled && !!this.ctx.config.TENOR_API_KEY,
       voiceEnabled: s.voiceEnabled,
       voiceBackend: s.voiceBackend,
-      livekitUrl: s.voiceBackend === 'LIVEKIT' ? s.livekitUrl : '',
+      livekitUrl: s.voiceBackend === 'LIVEKIT' && primary ? primary.url : '',
       // ICE-Server nur beim eingebauten Mesh; LiveKit bringt seine eigene Aushandlung mit.
       iceServers: s.voiceEnabled && s.voiceBackend === 'MESH' ? this.iceServers(userId) : [],
       maxImageBytes: s.maxChatImageBytes,
     };
   }
 
-  /** LiveKit-Zugangstoken für eine Voice-Konversation (nur Mitglieder, nur wenn LiveKit konfiguriert). */
+  /**
+   * LiveKit-Zugangstoken für eine Voice-Konversation (nur Mitglieder, nur wenn LiveKit konfiguriert).
+   * Wählt per Failover den ersten erreichbaren Server aus der geordneten Liste (Primär zuerst).
+   */
   async voiceToken(user: User, conversationId: string): Promise<VoiceToken> {
     const s = await this.ctx.settings.get();
-    const { config } = this.ctx;
     if (!s.voiceEnabled) throw forbidden('Sprachchat ist deaktiviert', 'voice_disabled');
-    if (s.voiceBackend !== 'LIVEKIT' || !s.livekitUrl || !config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET) {
-      throw forbidden('LiveKit-Voice ist nicht konfiguriert', 'livekit_not_configured');
-    }
+    if (s.voiceBackend !== 'LIVEKIT') throw forbidden('LiveKit-Voice ist nicht konfiguriert', 'livekit_not_configured');
+    const servers = resolveVoiceServers(s, this.ctx.config);
+    if (servers.length === 0) throw forbidden('LiveKit-Voice ist nicht konfiguriert', 'livekit_not_configured');
     await this.membership(conversationId, user.id); // wirft 404, wenn kein Mitglied
+    const chosen = (await this.voiceFailover.pick(servers)) ?? servers[0];
     const room = `conv_${conversationId}`;
     const token = createLivekitToken({
-      apiKey: config.LIVEKIT_API_KEY,
-      apiSecret: config.LIVEKIT_API_SECRET,
+      apiKey: chosen.apiKey,
+      apiSecret: chosen.apiSecret,
       identity: user.id,
       name: user.displayName ?? user.username,
       room,
     });
-    return { url: s.livekitUrl, token, room };
+    return { url: chosen.url, token, room, name: chosen.name };
+  }
+
+  /** Erreichbarkeits-Status aller konfigurierten Voice-Server (für die Admin-Anzeige). */
+  async voiceStatus() {
+    const s = await this.ctx.settings.get();
+    const servers = resolveVoiceServers(s, this.ctx.config);
+    const health = await this.voiceFailover.status(servers);
+    // Gewählt würde der erste erreichbare; ist keiner erreichbar, trotzdem der Primär (Index 0, best effort).
+    let activeIndex = health.findIndex((h) => h.healthy);
+    if (activeIndex < 0 && health.length > 0) activeIndex = 0;
+    return health.map((h, i) => ({ name: h.name, url: h.url, healthy: h.healthy, order: i, active: i === activeIndex }));
   }
 
   /** Mitgliedschaft prüfen (wirft 404, wenn der Nutzer nicht Mitglied ist). */

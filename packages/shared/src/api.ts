@@ -33,6 +33,7 @@ import type {
   SessionInfo,
   StorageOverview,
   ServerUpdateStatus,
+  VoiceServerStatus,
   StoreFacets,
   StoreHome,
   StoreSearchQuery,
@@ -518,6 +519,7 @@ export class ApiClient {
     settings: () => this.get<AdminSettings>('/admin/settings'),
     updateSettings: (data: Partial<AdminSettings>) => this.patch<AdminSettings>('/admin/settings', data),
     testMail: () => this.post<{ ok: true }>('/admin/settings/test-mail'),
+    voiceStatus: () => this.get<VoiceServerStatus[]>('/admin/voice/status'),
     uploadLogo: (kind: 'logo' | 'client-logo', file: Blob) => {
       const fd = new FormData();
       fd.append('file', file);

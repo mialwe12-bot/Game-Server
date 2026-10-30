@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image as ImageIcon } from 'lucide-react';
+import { ArrowDown, ArrowUp, Image as ImageIcon, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AdminSettings, RegistrationMode, ServerUpdateStatus } from '@gameserver/shared';
+import type { AdminSettings, RegistrationMode, ServerUpdateStatus, VoiceServerConfig } from '@gameserver/shared';
 import { Button, Card, ErrorState, Field, Input, PageLoader, Select, Textarea, Toggle } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -148,9 +148,9 @@ export default function SettingsPage() {
             </Field>
           )}
           {s.voiceEnabled && s.voiceBackend === 'LIVEKIT' && (
-            <Field label={t('admin.settingsPage.livekitUrl')} hint={t('admin.settingsPage.livekitUrlHint')}>
-              <Input value={s.livekitUrl} onChange={(e) => setS({ ...s, livekitUrl: e.target.value })} placeholder="wss://voice.example.com" />
-            </Field>
+            <div className="md:col-span-2">
+              <VoiceServersEditor servers={s.voiceServers ?? []} onChange={(v) => setS({ ...s, voiceServers: v })} />
+            </div>
           )}
           <Field label={t('admin.settingsPage.maxChatImageMb')}>
             <Input
@@ -261,6 +261,111 @@ function LogoField({ label, hint, url, busy, onPick, onClear }: { label: string;
         )}
       </div>
     </Field>
+  );
+}
+
+/**
+ * Editor für die geordnete Voice-Server-Liste (Failover). Eintrag 0 = Primär (idealerweise der Main-Server),
+ * danach die Fallbacks in der Reihenfolge, in der sie einspringen. Leere API-Felder = Zugangsdaten aus der
+ * Server-Umgebung (LIVEKIT_API_KEY/SECRET). Secrets werden vom Server maskiert geliefert (Platzhalter) und nur
+ * bei Eingabe eines neuen Werts überschrieben.
+ */
+function VoiceServersEditor({ servers, onChange }: { servers: VoiceServerConfig[]; onChange: (v: VoiceServerConfig[]) => void }) {
+  const { t } = useTranslation();
+  const status = useQuery({ queryKey: ['admin', 'voice-status'], queryFn: () => api.admin.voiceStatus(), staleTime: 10_000 });
+
+  const update = (i: number, patch: Partial<VoiceServerConfig>) => onChange(servers.map((srv, idx) => (idx === i ? { ...srv, ...patch } : srv)));
+  const remove = (i: number) => onChange(servers.filter((_, idx) => idx !== i));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= servers.length) return;
+    const copy = servers.slice();
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+    onChange(copy);
+  };
+  const add = () => onChange([...servers, { name: '', url: '', apiKey: '', apiSecret: '' }]);
+  const health = (url: string) => status.data?.find((s) => s.url === url);
+
+  return (
+    <div className="space-y-3 rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">{t('admin.settingsPage.voiceServers')}</p>
+          <p className="text-xs text-muted">{t('admin.settingsPage.voiceServersHint')}</p>
+        </div>
+        <Button size="sm" variant="ghost" onClick={() => status.refetch()} loading={status.isFetching}>
+          <RefreshCw className="mr-1 h-4 w-4" />
+          {t('admin.settingsPage.voiceStatusRefresh')}
+        </Button>
+      </div>
+
+      {servers.length === 0 && <p className="text-sm text-muted">{t('admin.settingsPage.voiceServersEmpty')}</p>}
+
+      <div className="space-y-3">
+        {servers.map((srv, i) => {
+          const h = health(srv.url);
+          return (
+            <div key={i} className="rounded-md border border-border bg-surface-2/40 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-surface-2 px-2 py-0.5 text-xs font-medium">
+                    {i === 0 ? t('admin.settingsPage.voicePrimary') : t('admin.settingsPage.voiceFallbackN', { n: i })}
+                  </span>
+                  {h && (
+                    <span className={`inline-flex items-center gap-1 text-xs ${h.healthy ? 'text-success' : 'text-warning'}`}>
+                      <span className={`h-2 w-2 rounded-full ${h.healthy ? 'bg-success' : 'bg-warning'}`} />
+                      {h.healthy ? t('admin.settingsPage.voiceReachable') : t('admin.settingsPage.voiceUnreachable')}
+                      {h.active && ` · ${t('admin.settingsPage.voiceActive')}`}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => move(i, -1)} disabled={i === 0} aria-label={t('admin.settingsPage.voiceMoveUp')}>
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => move(i, 1)}
+                    disabled={i === servers.length - 1}
+                    aria-label={t('admin.settingsPage.voiceMoveDown')}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(i)} aria-label={t('common.remove')}>
+                    <Trash2 className="h-4 w-4 text-danger" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label={t('admin.settingsPage.voiceServerName')}>
+                  <Input value={srv.name ?? ''} onChange={(e) => update(i, { name: e.target.value })} placeholder={t('admin.settingsPage.voiceServerNamePlaceholder')} />
+                </Field>
+                <Field label={t('admin.settingsPage.voiceServerUrl')}>
+                  <Input value={srv.url} onChange={(e) => update(i, { url: e.target.value })} placeholder="wss://voice.example.com" />
+                </Field>
+                <Field label={t('admin.settingsPage.voiceServerApiKey')} hint={t('admin.settingsPage.voiceServerCredsHint')}>
+                  <Input value={srv.apiKey ?? ''} onChange={(e) => update(i, { apiKey: e.target.value })} placeholder={t('admin.settingsPage.voiceFromEnv')} />
+                </Field>
+                <Field label={t('admin.settingsPage.voiceServerApiSecret')}>
+                  <Input
+                    type="password"
+                    value={srv.apiSecret ?? ''}
+                    onChange={(e) => update(i, { apiSecret: e.target.value })}
+                    placeholder={t('admin.settingsPage.voiceFromEnv')}
+                  />
+                </Field>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Button size="sm" variant="ghost" onClick={add} disabled={servers.length >= 10}>
+        <Plus className="mr-1 h-4 w-4" />
+        {t('admin.settingsPage.voiceAddServer')}
+      </Button>
+    </div>
   );
 }
 

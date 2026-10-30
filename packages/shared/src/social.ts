@@ -185,6 +185,8 @@ export interface VoiceToken {
   url: string;
   token: string;
   room: string;
+  /** Name des gewählten Voice-Servers (für Anzeige, z. B. bei Failover auf einen Fallback). */
+  name?: string;
 }
 
 export interface GifResult {

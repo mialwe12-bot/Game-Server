@@ -157,11 +157,21 @@ Das Mesh ist bis ca. 6 Personen sinnvoll. Für größere Räume, bessere Qualit�
 1. In `.env` setzen: `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (frei wählbar), `LIVEKIT_NODE_IP` (öffentliche Server-IP).
 2. Starten: `docker compose --profile voice-sfu up -d`. Ports `7880/tcp`, `7881/tcp`, `50000-60000/udp` freigeben; `7880`
    per Caddy als `wss://voice.<deine-domain>` terminieren.
-3. In **Verwaltung → Einstellungen → Soziales**: „Sprachchat erlauben“ an, **Voice-Backend = LiveKit**, Adresse
-   `wss://voice.<deine-domain>` eintragen.
+3. In **Verwaltung → Einstellungen → Soziales**: „Sprachchat erlauben“ an, **Voice-Backend = LiveKit**. Unter
+   **Voice-Server (mit Ausfallsicherung)** den **Primär-Server** hinzufügen – das ist der LiveKit auf dem Main-Server,
+   Adresse `wss://voice.<deine-domain>`. API-Key/Secret pro Eintrag leer lassen = `LIVEKIT_API_KEY`/`SECRET` aus der
+   Umgebung.
 
 Der Server stellt pro Unterhaltung ein zeitlich begrenztes LiveKit-Token aus (nur Mitglieder); die Teilnehmer-Anzeige
 läuft weiter über den WebSocket-Hub. Umschalten Mesh ↔ LiveKit geht jederzeit im Admin-Panel.
+
+**Ausfallsicherung (Failover).** Die Voice-Server stehen als geordnete Liste im Admin-Panel: Eintrag 1 ist der Primär
+(Main-Server), danach folgen beliebig viele Fallbacks in der Reihenfolge, in der sie einspringen sollen. Vor jedem
+Beitritt prüft der Server per kurzer HTTP-Probe die Erreichbarkeit (mit 30 s Cache) und gibt das Token für den **ersten
+erreichbaren** Server aus – fällt der Primär aus, landen neue Beitritte automatisch auf dem nächsten Server. Jeder
+Fallback kann ein eigenes API-Key/Secret-Paar haben (für einen LiveKit auf einer anderen Maschine) oder die Felder leer
+lassen und die Umgebungs-Zugangsdaten mitbenutzen. Der aktuelle Erreichbarkeits-Status („erreichbar/aktiv") ist im
+Panel sichtbar. Secrets werden nur maskiert an den Browser geschickt und beim Speichern nur bei Neueingabe überschrieben.
 
 ### GIFs
 

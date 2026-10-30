@@ -270,7 +270,16 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
 
   // ---- Einstellungen ----
 
-  app.get('/settings', { schema: { tags: ['admin'], summary: 'Einstellungen' }, config: { allowInMaintenance: true } }, async () => ctx.settings.get());
+  // API-Secrets der Voice-Server in Antworten maskieren (gesetztes Secret → Platzhalter, sonst leer).
+  const SECRET_MASK = '********';
+  const maskSettings = (s: import('@gameserver/shared').AdminSettings) => ({
+    ...s,
+    voiceServers: (s.voiceServers ?? []).map((v) => ({ ...v, apiSecret: v.apiSecret ? SECRET_MASK : '' })),
+  });
+
+  app.get('/settings', { schema: { tags: ['admin'], summary: 'Einstellungen' }, config: { allowInMaintenance: true } }, async () =>
+    maskSettings(await ctx.settings.get()),
+  );
 
   app.patch(
     '/settings',
@@ -300,6 +309,16 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
             voiceEnabled: z.boolean(),
             voiceBackend: z.enum(['MESH', 'LIVEKIT']),
             livekitUrl: z.string().max(300).regex(/^(|wss?:\/\/.+)$/, 'Muss leer oder eine ws(s)-URL sein'),
+            voiceServers: z
+              .array(
+                z.object({
+                  name: z.string().max(60).optional(),
+                  url: z.string().max(300).regex(/^wss?:\/\/.+/, 'Muss eine ws(s)-URL sein'),
+                  apiKey: z.string().max(200).optional(),
+                  apiSecret: z.string().max(400).optional(),
+                }),
+              )
+              .max(10),
             gifsEnabled: z.boolean(),
             maxChatImageBytes: z.number().int().min(64 * 1024).max(100 * 1024 ** 2),
             cloudSavesEnabled: z.boolean(),
@@ -322,10 +341,30 @@ export const adminRoutes: FastifyPluginAsyncZod = async (app) => {
       config: { allowInMaintenance: true },
     },
     async (req) => {
-      const updated = await ctx.settings.update(req.body);
-      await ctx.audit.log({ userId: req.auth!.user.id, action: 'admin.settings_updated', meta: req.body, ip: req.ip });
-      return updated;
+      const body = { ...req.body };
+      // Voice-Server: unverändertes/maskiertes Secret → bisheriges Secret behalten (Zuordnung über die URL).
+      if (body.voiceServers) {
+        const current = (await ctx.settings.get()).voiceServers ?? [];
+        body.voiceServers = body.voiceServers.map((v) => {
+          if (v.apiSecret && v.apiSecret !== SECRET_MASK) return v; // neues Secret übernehmen
+          const prev = current.find((c) => c.url === v.url);
+          return { ...v, apiSecret: prev?.apiSecret ?? '' };
+        });
+      }
+      const updated = await ctx.settings.update(body);
+      // Secrets niemals im Audit-Log im Klartext ablegen.
+      const auditMeta = body.voiceServers
+        ? { ...body, voiceServers: body.voiceServers.map((v) => ({ ...v, apiSecret: v.apiSecret ? SECRET_MASK : '' })) }
+        : body;
+      await ctx.audit.log({ userId: req.auth!.user.id, action: 'admin.settings_updated', meta: auditMeta, ip: req.ip });
+      return maskSettings(updated);
     },
+  );
+
+  app.get(
+    '/voice/status',
+    { schema: { tags: ['admin'], summary: 'Erreichbarkeit der Voice-Server (Failover-Status)' } },
+    async () => ctx.chat.voiceStatus(),
   );
 
   app.post(

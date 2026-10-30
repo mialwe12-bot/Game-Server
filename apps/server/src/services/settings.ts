@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   voiceEnabled: false,
   voiceBackend: 'MESH',
   livekitUrl: '',
+  voiceServers: [],
   gifsEnabled: true,
   maxChatImageBytes: 8 * 1024 ** 2,
   cloudSavesEnabled: true,
